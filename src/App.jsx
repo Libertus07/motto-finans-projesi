@@ -1,3 +1,5 @@
+// App.jsx (GÜNCELLEŞTİRİLMİŞ TAM İÇERİK)
+
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 // Firebase veri çekme importları hook'a taşındı, sadece auth kaldı
@@ -25,7 +27,6 @@ const CashierPOS = lazy(() => import('./pages/CashierPOS'));
 const Tables = lazy(() => import('./pages/Tables'));
 const CashierSettings = lazy(() => import('./pages/CashierSettings'));
 const ZReport = lazy(() => import('./pages/ZReport'));
-const Inventory = lazy(() => import('./pages/Inventory'));
 
 export default function PatronFinancePro() {
   const [user, setUser] = useState(null);
@@ -41,16 +42,36 @@ export default function PatronFinancePro() {
     stats, calculateFutureCashflow, getProfitabilityWarnings,
   } = useFinanceData(user); // Hook'u kullan
 
-  // 1. Auth (Bu blok App.jsx'te kalmalı)
+  // 1. Auth (Anonim Kullanıcıyı Kalıcı Hale Getirme Düzeltmesi)
   useEffect(() => {
     if (userRole === null) { setLoading(false); return; }
     
     if (userRole === 'kasiyer') setActiveTab('pos');
     else setActiveTab('dashboard');
 
-    const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error(e); } };
+    const initAuth = async () => { 
+        try { 
+            // KRİTİK: Firebase'i anonim olarak başlatıyoruz.
+            // onAuthStateChanged içerisine persistence logic'i ekliyoruz.
+            await signInAnonymously(auth); 
+        } catch (e) { 
+            console.error("Anonim giriş hatası:", e); 
+        } 
+    };
     initAuth();
-    return onAuthStateChanged(auth, (currentUser) => { setUser(currentUser); setLoading(false); });
+
+    // KRİTİK DÜZELTME: onAuthStateChanged içinde UID'yi Local Storage'a kaydetme
+    return onAuthStateChanged(auth, (currentUser) => { 
+        if (currentUser) {
+            // Mevcut veya yeni anonim UID'yi Local Storage'a kaydet
+            localStorage.setItem('motto_anon_uid', currentUser.uid);
+        } else {
+             // Oturum kapandıysa UID'yi temizle (gerekirse)
+             localStorage.removeItem('motto_anon_uid');
+        }
+        setUser(currentUser); 
+        setLoading(false); 
+    });
   }, [userRole]);
 
   // 2. Veri Çekme (TÜMÜ HOOK'A TAŞINDI, BU BÖLÜM SİLİNDİ)
@@ -100,9 +121,6 @@ export default function PatronFinancePro() {
 
       case 'recipe':
           return <Recipe ingredients={ingredients} />;
-
-      case 'inventory': 
-          return <Inventory ingredients={ingredients} debts={debts} />;
           
       case 'investments':
           return <Investments investments={investments} marketRates={marketRates} />;

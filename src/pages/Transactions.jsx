@@ -43,6 +43,14 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
         type: 'income', method: 'cash', cardBank: 'ziraat', category: 'Günlük', amount: '', desc: '' 
     });
     const [newShortcut, setNewShortcut] = useState({ label: '', type: 'expense', method: 'cash', cardBank: 'ziraat', category: 'Günlük', desc: '', icon: '⚡' });
+    
+    // 👇 YENİ STATE: Transfer Formu için eklendi
+    const [transferData, setTransferData] = useState({
+        from: 'ziraat', 
+        to: 'cash', 
+        amount: '', 
+        desc: ''
+    });
 
     // --- FIREBASE İŞLEMLERİ ---
     const handleAddTransaction = async () => {
@@ -87,20 +95,43 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
         });
     };
 
-    // --- TRANSFER İŞLEMİ ---
-    const handleAssetTransfer = async (from, to, amount, desc) => {
+    // --- TRANSFER İŞLEMİ (document.getElementById kaldırıldı) ---
+    const handleAssetTransfer = async () => {
+        const { from, to, amount, desc } = transferData;
+        
+        // Validation
         if(Number(amount) <= 0 || from === to) return;
+        
         const user = auth.currentUser;
         const batch = writeBatch(db);
         const ref = collection(db, 'artifacts', appId, 'users', user.uid, 'transactions');
         
-        const expense = { date: new Date().toISOString().split('T')[0], type: 'expense', amount: Number(amount), desc: `Transfer Çıkışı: ${desc}`, method: from === 'cash' ? 'cash' : 'card', cardBank: from === 'cash' ? null : from, category: 'Transfer' };
-        const income = { date: new Date().toISOString().split('T')[0], type: 'income', amount: Number(amount), desc: `Transfer Girişi: ${desc}`, method: to === 'cash' ? 'cash' : 'card', cardBank: to === 'cash' ? null : to, subMethod: 'Transfer' };
+        const expense = { 
+            date: new Date().toISOString().split('T')[0], 
+            type: 'expense', 
+            amount: Number(amount), 
+            desc: `Transfer Çıkışı: ${desc || 'Varlık Transferi'}`, 
+            method: from === 'cash' ? 'cash' : 'card', 
+            cardBank: from === 'cash' ? null : from, 
+            category: 'Transfer' 
+        };
+        
+        const income = { 
+            date: new Date().toISOString().split('T')[0], 
+            type: 'income', 
+            amount: Number(amount), 
+            desc: `Transfer Girişi: ${desc || 'Varlık Transferi'}`, 
+            method: to === 'cash' ? 'cash' : 'card', 
+            cardBank: to === 'cash' ? null : to, 
+            subMethod: 'Transfer' 
+        };
 
         batch.set(doc(ref), expense);
         batch.set(doc(ref), income);
         await batch.commit();
         alert("Transfer Başarılı");
+        // Formu sıfırla
+        setTransferData({ from: 'ziraat', to: 'cash', amount: '', desc: '' });
     };
 
     return (
@@ -137,17 +168,60 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
                         <button onClick={() => setNewTrans({...newTrans, type: 'transfer'})} className={`py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-1 ${newTrans.type === 'transfer' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}><RefreshCw size={16}/> TRANSFER</button>
                     </div>
 
-                    {/* TRANSFER FORMU */}
+                    {/* TRANSFER FORMU (Artık state kullanıyor) */}
                     {newTrans.type === 'transfer' ? (
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                             <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30 mb-4">
                                 <h4 className="font-bold text-blue-400 text-sm mb-3 flex items-center gap-2"><RefreshCw size={16}/> Hızlı Varlık Transferi</h4>
                                 <div className="grid grid-cols-2 gap-4 mb-3">
-                                    <div><label className="text-xs text-slate-500 block mb-1">Nereden</label><select id="transferFrom" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm"><option value="ziraat">Ziraat Bankası</option><option value="halk">Halk Bankası</option><option value="iban">Diğer IBAN</option><option value="cash">Nakit Kasa</option></select></div>
-                                    <div><label className="text-xs text-slate-500 block mb-1">Nereye</label><select id="transferTo" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm"><option value="cash">Nakit Kasa</option><option value="ziraat">Ziraat Bankası</option><option value="halk">Halk Bankası</option><option value="iban">Diğer IBAN</option></select></div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 block mb-1">Nereden</label>
+                                        <select 
+                                            value={transferData.from} 
+                                            onChange={(e) => setTransferData({...transferData, from: e.target.value})}
+                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm"
+                                        >
+                                            <option value="ziraat">Ziraat Bankası</option>
+                                            <option value="halk">Halk Bankası</option>
+                                            <option value="iban">Diğer IBAN</option>
+                                            <option value="cash">Nakit Kasa</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 block mb-1">Nereye</label>
+                                        <select 
+                                            value={transferData.to} 
+                                            onChange={(e) => setTransferData({...transferData, to: e.target.value})}
+                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm"
+                                        >
+                                            <option value="cash">Nakit Kasa</option>
+                                            <option value="ziraat">Ziraat Bankası</option>
+                                            <option value="halk">Halk Bankası</option>
+                                            <option value="iban">Diğer IBAN</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div><label className="text-xs text-slate-500 block mb-1">Tutar & Açıklama</label><div className="flex gap-2"><input type="number" id="transferAmount" placeholder="Tutar" className="w-1/3 bg-slate-900 border border-slate-600 rounded-lg p-2 text-white"/><input type="text" id="transferDesc" placeholder="Açıklama..." className="w-2/3 bg-slate-900 border border-slate-600 rounded-lg p-2 text-white"/></div></div>
-                                <button onClick={() => handleAssetTransfer(document.getElementById('transferFrom').value, document.getElementById('transferTo').value, document.getElementById('transferAmount').value, document.getElementById('transferDesc').value)} className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors">Transferi Tamamla</button>
+                                <div>
+                                    <label className="text-xs text-slate-500 block mb-1">Tutar & Açıklama</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="number" 
+                                            placeholder="Tutar" 
+                                            value={transferData.amount}
+                                            onChange={(e) => setTransferData({...transferData, amount: e.target.value})}
+                                            className="w-1/3 bg-slate-900 border border-slate-600 rounded-lg p-2 text-white"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Açıklama..." 
+                                            value={transferData.desc}
+                                            onChange={(e) => setTransferData({...transferData, desc: e.target.value})}
+                                            className="w-2/3 bg-slate-900 border border-slate-600 rounded-lg p-2 text-white"
+                                        />
+                                    </div>
+                                </div>
+                                {/* Artık document.getElementById kullanmaya gerek yok, fonksiyon doğrudan state'i kullanır. */}
+                                <button onClick={handleAssetTransfer} className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors">Transferi Tamamla</button>
                             </div>
                         </div>
                     ) : (

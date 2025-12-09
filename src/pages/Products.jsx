@@ -1,9 +1,15 @@
+// pages/Products.jsx
+
 import React, { useState, useRef } from 'react';
 import { Coffee, PlusCircle, Search, Trash2, AlertTriangle, ArrowRight, Calculator, MinusCircle, GripVertical, TrendingUp, Wand2, Loader2, Sparkles } from 'lucide-react';
 import { addDoc, deleteDoc, updateDoc, doc, collection, writeBatch } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import { CATEGORIES, GEMINI_API_KEY } from '../utils/constants';
+
+// 👇 YENİ IMPORT: Modal bileşenini import et
+import BulkUpdateModal from '../components/BulkUpdateModal'; 
+
 
 const Products = ({ products, isPatron }) => {
     const [searchTerm, setSearchTerm] = useState("");
@@ -13,6 +19,10 @@ const Products = ({ products, isPatron }) => {
     const [aiLoading, setAiLoading] = useState(false);
     const [aiProductDesc, setAiProductDesc] = useState("");
     
+    // 👇 YENİ STATE: Modal'ı yönetmek için
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false); // Toplu güncelleme yükleniyor
+
     // Sürükle Bırak Referansları
     const dragItem = useRef(null);
     const dragOverItem = useRef(null);
@@ -60,7 +70,7 @@ const Products = ({ products, isPatron }) => {
         setAiProductDesc("");
     };
 
-    // 👇 GÜNCELLENEN KISIM: Onay penceresi (window.confirm) kaldırıldı
+    // GÜNCELLEME: Onay penceresi (window.confirm) kaldırıldı
     const handleDeleteProduct = async (id) => {
         await deleteDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'products', id));
     };
@@ -70,20 +80,30 @@ const Products = ({ products, isPatron }) => {
         await updateDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'products', id), { [field]: val });
     };
 
-    const handleBulkPriceUpdate = async () => {
-        const percent = Number(prompt("Seçili kategoriye yüzde kaç zam/indirim yapılsın? (Örn: 10 veya -10)"));
+    // 👇 GÜNCELLENEN FONKSİYON: Modal'dan gelen yüzdeyi alır
+    const handleBulkPriceUpdate = async (percent) => {
         if (!percent) return;
-        // Toplu işlem tehlikeli olduğu için buradaki onayı tutmak daha güvenli olabilir, istersen bunu da kaldırabiliriz.
-        if(!window.confirm(`${selectedCategory} kategorisine %${percent} işlem yapılacak. Emin misiniz?`)) return;
-        
+        setBulkUpdateLoading(true);
+
         const batch = writeBatch(db);
         const targets = products.filter(p => selectedCategory === 'Tümü' || p.category === selectedCategory);
+        
         targets.forEach(p => {
             const newPrice = Math.ceil(p.price * (1 + percent / 100));
             batch.update(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'products', p.id), { price: newPrice });
         });
-        await batch.commit();
+        
+        try {
+            await batch.commit();
+            alert(`✅ ${selectedCategory} kategorisindeki ${targets.length} ürünün fiyatı %${percent} oranında güncellendi!`);
+        } catch (error) {
+            console.error("Toplu güncelleme hatası:", error);
+            alert("Toplu güncelleme sırasında bir hata oluştu.");
+        } finally {
+            setBulkUpdateLoading(false);
+        }
     };
+    // 👆 GÜNCELLENEN FONKSİYON SONU
 
     // --- HIZLI SATIŞ SİMÜLATÖRÜ ---
     const handleSalesChange = (id, val) => setDailySales(prev => ({ ...prev, [id]: Math.max(0, Number(val)) }));
@@ -110,18 +130,42 @@ const Products = ({ products, isPatron }) => {
     };
 
     // --- AI AÇIKLAMA ---
-    const generateDescription = async () => {
-        if(!newProduct.name) return;
-        setAiLoading(true);
-        try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: `Bir kafe menüsü için "${newProduct.name}" (${newProduct.category}) ürününe kısa, iştah açıcı, 1 cümlelik Türkçe açıklama yaz.` }] }] })
-            });
-            const data = await response.json();
-            setAiProductDesc(data.candidates?.[0]?.content?.parts?.[0]?.text || "Açıklama üretilemedi.");
-        } catch (e) { console.error(e); } finally { setAiLoading(false); }
-    };
+const generateDescription = async () => {
+    if(!newProduct.name) return;
+    setAiLoading(true);
+
+    // 👇 KRİTİK KONTROL: Eğer anahtar boşsa, network isteği yapmadan uyarı ver.
+    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("API Anahtarı Yüklenemedi")) {
+        setAiProductDesc("Hata: Gemini API Anahtarı yüklenemedi. Lütfen .env dosyanızı ve anahtarın geçerliliğini kontrol edin.");
+        setAiLoading(false);
+        return;
+    }
+    // 👆 Kontrol sonu
+    
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: `Bir kafe menüsü için "${newProduct.name}" (${newProduct.category}) ürününe kısa, iştah açıcı, 1 cümlelik Türkçe açıklama yaz.` }] }] })
+        });
+        
+        // HTTP Hata Kontrolü: 200 (OK) dışında bir durum kodu gelirse uyarı ver.
+        if (!response.ok) {
+            // Sunucu bir hata kodu (403, 400 vb.) döndürdü
+            const errorData = await response.json().catch(() => ({})); 
+            console.error("Gemini API HTTP Error:", response.status, errorData);
+            setAiProductDesc(`API Bağlantı Hatası: Kod ${response.status}. Anahtarınızı kontrol edin.`);
+            return;
+        }
+
+        const data = await response.json();
+        setAiProductDesc(data.candidates?.[0]?.content?.parts?.[0]?.text || "Açıklama üretilemedi (Boş cevap).");
+    } catch (e) { 
+        console.error("AI İstek Hatası:", e); 
+        setAiProductDesc("Açıklama üretilemedi (Network veya Fetch hatası).");
+    } finally { 
+        setAiLoading(false); 
+    }
+};
 
     // Filtreleme
     const filteredProducts = products.filter(p => 
@@ -131,12 +175,23 @@ const Products = ({ products, isPatron }) => {
 
     return (
         <div className="max-w-7xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+             
+             {/* MODAL BİLEŞENİ: Buraya entegre ediliyor */}
+             <BulkUpdateModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                selectedCategory={selectedCategory}
+                onUpdate={handleBulkPriceUpdate}
+                loading={bulkUpdateLoading}
+             />
+
              {/* ÜST PANEL */}
              <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-800 p-4 rounded-2xl border border-slate-700">
                  <div><h2 className="text-2xl font-bold text-white flex items-center gap-2"><Coffee className="text-orange-400"/> Menü Yönetimi</h2></div>
                  <div className="flex gap-2 w-full md:w-auto">
                      <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16}/><input type="text" placeholder="Ara..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-xl pl-10 pr-4 py-2 text-sm text-white outline-none"/></div>
-                     {isPatron && <button onClick={handleBulkPriceUpdate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap"><TrendingUp size={16}/> Toplu Fiyat</button>}
+                     {/* 👇 GÜNCELLENDİ: Modalı açma butonu */}
+                     {isPatron && <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap"><TrendingUp size={16}/> Toplu Fiyat</button>}
                  </div>
              </div>
 

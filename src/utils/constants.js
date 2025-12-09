@@ -1,4 +1,5 @@
-export const GEMINI_API_KEY = "AIzaSyDqEw1-jeTk_T-8BKYzkauLNM3MFaaKtlw"
+// ✅ DÜZELTME: Gemini API Key artık .env'den VITE_ önekiyle çekiliyor.
+export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "API Anahtarı Yüklenemedi";
 export const ADMIN_PASSWORD = 'Motto1786';
 
 export const THEME = {
