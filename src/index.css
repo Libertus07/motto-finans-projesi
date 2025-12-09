@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Özel kaydırma çubuğu stillerimiz */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b; 
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569; 
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b; 
+}
+@media print {
+  /* Yazdırma sırasında her şeyi gizle */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Sadece fiş alanını görünür yap */
+  #printable-receipt, #printable-receipt * {
+    visibility: visible;
+  }
+
+  /* Fişi kağıdın en tepesine yerleştir */
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: block !important; /* hidden class'ını ezmek için */
+  }
+
+  /* Arka plan renklerini ve grafikleri yok sayma (Yazıcı ayarı) */
+  body {
+    -webkit-print-color-adjust: exact;
+  }
+}
