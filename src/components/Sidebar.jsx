@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid } from 'lucide-react';
+import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid, Package } from 'lucide-react';
 import { THEME } from '../utils/constants';
 
 const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userRole }) => {
@@ -24,6 +24,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
     
     // Diğerleri...
     { id: 'products', label: 'Menü & Ürün', icon: Coffee, roles: ['patron', 'kasiyer'] },
+    { id: 'inventory', label: 'Stok & Tedarikçi', icon: Package, roles: ['patron'] },
     { id: 'recipe', label: 'Maliyet', icon: ChefHat, roles: ['patron'] },
     { id: 'investments', label: 'Yatırımlar', icon: Coins, roles: ['patron'] },
     { id: 'stats', label: 'Raporlar', icon: BarChart3, roles: ['patron'] },

@@ -25,6 +25,7 @@ const CashierPOS = lazy(() => import('./pages/CashierPOS'));
 const Tables = lazy(() => import('./pages/Tables'));
 const CashierSettings = lazy(() => import('./pages/CashierSettings'));
 const ZReport = lazy(() => import('./pages/ZReport'));
+const Inventory = lazy(() => import('./pages/Inventory'));
 
 export default function PatronFinancePro() {
   const [user, setUser] = useState(null);
@@ -99,6 +100,9 @@ export default function PatronFinancePro() {
 
       case 'recipe':
           return <Recipe ingredients={ingredients} />;
+
+      case 'inventory': 
+          return <Inventory ingredients={ingredients} debts={debts} />;
           
       case 'investments':
           return <Investments investments={investments} marketRates={marketRates} />;
