@@ -1,8 +1,11 @@
+// pages/Recipe.jsx (GÜNCELLENMİŞ)
+
 import React, { useState } from 'react';
 import { ChefHat, Package, Settings, Move, PlusCircle, AlertTriangle, Scale, X, Loader2, Wand2, Sparkles, Trash2 } from 'lucide-react';
-import { addDoc, updateDoc, doc, collection, writeBatch, deleteDoc } from 'firebase/firestore';
+import { addDoc, deleteDoc, updateDoc, doc, collection } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
+import ConfirmationModal from '../components/ConfirmationModal'; // 👇 MODAL IMPORT
 
 const Recipe = ({ ingredients }) => {
     const [isEditingIngredients, setIsEditingIngredients] = useState(false);
@@ -10,6 +13,9 @@ const Recipe = ({ ingredients }) => {
     const [recipeBuilder, setRecipeBuilder] = useState({ productName: '', yieldAmount: 1, items: [] });
     const [aiLoading, setAiLoading] = useState(false);
     const [aiRecipeAdvice, setAiRecipeAdvice] = useState("");
+    
+    // 👇 Silme onayı için state
+    const [deleteId, setDeleteId] = useState(null);
 
     // --- HAMMADDE YÖNETİMİ ---
     const handleAddIngredient = async () => {
@@ -32,33 +38,28 @@ const Recipe = ({ ingredients }) => {
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', id), { [field]: val });
     };
 
-    const handleDeleteIngredient = async (id) => {
-        if(!window.confirm('Silinsin mi?')) return;
+    // 👇 Modal onayından sonra çalışacak silme fonksiyonu
+    const confirmDelete = async () => {
+        if (!deleteId) return;
         const user = auth.currentUser;
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', id));
+        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', deleteId));
+        setDeleteId(null);
     };
 
     // --- REÇETE OLUŞTURMA MANTIĞI ---
     const addIngredientToRecipe = (id) => {
         const ing = ingredients.find(i => i.id === id);
         if (!ing) return;
-        
         const existing = recipeBuilder.items.find(item => item.id === id);
         if (!existing) {
-            setRecipeBuilder(prev => ({
-                ...prev,
-                items: [...prev.items, { id: ing.id, name: ing.name, price: ing.price, unit: ing.unit, quantity: 1 }]
-            }));
+            setRecipeBuilder(prev => ({ ...prev, items: [...prev.items, { id: ing.id, name: ing.name, price: ing.price, unit: ing.unit, quantity: 1 }] }));
         } else {
             updateRecipeItemQuantity(id, existing.quantity + 1);
         }
     };
 
     const updateRecipeItemQuantity = (id, quantity) => {
-        setRecipeBuilder(prev => ({
-            ...prev,
-            items: prev.items.map(item => item.id === id ? { ...item, quantity: Number(quantity) } : item)
-        }));
+        setRecipeBuilder(prev => ({ ...prev, items: prev.items.map(item => item.id === id ? { ...item, quantity: Number(quantity) } : item) }));
     };
 
     const removeRecipeItem = (id) => {
@@ -72,11 +73,9 @@ const Recipe = ({ ingredients }) => {
 
     const recipeCost = calculateRecipeCost();
 
-    // --- AI TAVSİYE ---
     const generateRecipeAdvice = async () => {
         if(recipeBuilder.items.length === 0) return setAiRecipeAdvice("Lütfen önce malzeme ekleyin.");
         setAiLoading(true);
-        // Simüle edilmiş AI cevabı (API maliyeti olmasın diye)
         setTimeout(() => {
             let advice = `Birim maliyetiniz: ${formatCurrency(recipeCost.unitCost)} ₺. `;
             if(recipeCost.unitCost > 50) advice += "Maliyet yüksek görünüyor, porsiyonu küçültmeyi düşünebilirsiniz.";
@@ -88,6 +87,15 @@ const Recipe = ({ ingredients }) => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+             {/* 👇 Onay Modalı */}
+             <ConfirmationModal 
+                isOpen={!!deleteId} 
+                onClose={() => setDeleteId(null)} 
+                onConfirm={confirmDelete}
+                title="Malzeme Silinsin mi?" 
+                message="Bu malzemeyi silmek istediğinize emin misiniz? Reçeteler etkilenebilir."
+             />
+
              <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-white flex items-center gap-2"><ChefHat className="text-orange-500"/> Reçete & Maliyet</h2></div>
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
@@ -118,7 +126,8 @@ const Recipe = ({ ingredients }) => {
                                         <Move size={14} className="text-slate-500"/>
                                         <input type="text" value={ing.name} onChange={(e) => handleUpdateIngredient(ing.id, 'name', e.target.value)} className="bg-transparent border-b border-slate-600 text-xs text-white w-full outline-none"/>
                                         <input type="number" value={ing.price} onChange={(e) => handleUpdateIngredient(ing.id, 'price', e.target.value)} className="bg-transparent border-b border-slate-600 text-xs text-orange-400 w-12 text-center outline-none"/>
-                                        <button onClick={(e) => {e.stopPropagation(); handleDeleteIngredient(ing.id)}} className="text-slate-600 hover:text-red-500"><Trash2 size={14}/></button>
+                                        {/* 👇 Silme butonu state güncelliyor */}
+                                        <button onClick={(e) => {e.stopPropagation(); setDeleteId(ing.id)}} className="text-slate-600 hover:text-red-500"><Trash2 size={14}/></button>
                                     </div>
                                 ) : (
                                     <>
@@ -140,7 +149,7 @@ const Recipe = ({ ingredients }) => {
                     </div>
                 </div>
 
-                {/* SAĞ: HESAPLAYICI */}
+                {/* SAĞ: HESAPLAYICI (Aynı kaldı) */}
                 <div className="lg:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700">
                     <h3 className="font-bold text-slate-300 mb-4 flex items-center gap-2"><Scale size={18}/> Hesaplayıcı</h3>
                     <div className="space-y-4">

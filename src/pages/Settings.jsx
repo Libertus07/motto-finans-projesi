@@ -1,14 +1,19 @@
+// pages/Settings.jsx (MODAL EKLENMİŞ HALİ)
+
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, Database, Trash2, Target, Building2, User, Zap, FileText, Loader2 } from 'lucide-react';
 import { doc, setDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
-// 👇 INITIAL_TABLES BURAYA EKLENDİ
 import { INITIAL_TRANSACTIONS, INITIAL_PRODUCTS, INITIAL_DEBTS, INITIAL_INVESTMENTS, INITIAL_QUICK_ACTIONS, INITIAL_INGREDIENTS, INITIAL_NOTES, INITIAL_TABLES } from '../utils/constants';
+import ConfirmationModal from '../components/ConfirmationModal'; // 👇 MODAL IMPORT
 
 const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) => {
     const [dbLoading, setDbLoading] = useState(false);
     const user = auth.currentUser;
+    
+    // 👇 Modal State'leri
+    const [confirmModal, setConfirmModal] = useState({ open: false, type: '', title: '', message: '', action: null });
 
     const handleUpdateGoal = async (val) => {
         setMonthlyGoal(val);
@@ -21,16 +26,12 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
         if(user) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'fixedCosts'), newCosts);
     };
 
-    // --- VERİ YÜKLEME FONKSİYONU (MASALAR EKLENDİ) ---
     const seedDemoData = async () => {
         if (!user) return;
-        if (!window.confirm("Mevcut verilerin üzerine örnek veriler (MASALAR DAHİL) eklenecek. Devam edilsin mi?")) return;
-        
         setDbLoading(true);
         const userId = user.uid;
         const batch = writeBatch(db);
 
-        // Mevcut Veriler
         INITIAL_TRANSACTIONS.forEach(t => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'transactions')), t));
         INITIAL_PRODUCTS.forEach(p => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'products')), p));
         INITIAL_DEBTS.forEach(d => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'debts')), d));
@@ -39,33 +40,21 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
         INITIAL_INGREDIENTS.forEach(ing => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'ingredients')), ing));
         INITIAL_NOTES.forEach(n => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'notes')), n));
         
-        // 👇 YENİ EKLENEN KISIM: Masaları Veritabanına Yaz
         if (INITIAL_TABLES) {
             INITIAL_TABLES.forEach(t => {
-                // table-1, table-2 gibi sabit ID'lerle kaydediyoruz ki sıralama bozulmasın
                 batch.set(doc(db, 'artifacts', appId, 'users', userId, 'tables', t.id), t);
             });
         }
 
-        // Ayarlar
         batch.set(doc(db, 'artifacts', appId, 'users', userId, 'settings', 'fixedCosts'), { rent: 0, staff: 0, bills: 0, other: 0 });
         batch.set(doc(db, 'artifacts', appId, 'users', userId, 'settings', 'monthlyGoal'), { value: 120000 });
 
-        try { 
-            await batch.commit(); 
-            alert("✅ Örnek veriler ve Masalar başarıyla yüklendi!"); 
-        } catch (e) { 
-            alert("Hata: " + e.message); 
-        } finally { 
-            setDbLoading(false); 
-        }
+        try { await batch.commit(); alert("✅ Örnek veriler ve Masalar başarıyla yüklendi!"); } catch (e) { alert("Hata: " + e.message); } finally { setDbLoading(false); setConfirmModal({ ...confirmModal, open: false }); }
     };
 
     const handleHardReset = async () => {
-        if (!window.confirm("⚠️ DİKKAT: TÜM VERİLER SİLİNECEK! Bu işlem geri alınamaz.")) return;
         setDbLoading(true);
         const userId = user.uid;
-        // 'tables' koleksiyonunu da silinecekler listesine ekledik
         const collections = ['transactions', 'products', 'debts', 'investments', 'quickActions', 'ingredients', 'notes', 'tables'];
         
         try {
@@ -77,11 +66,36 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
             }
             alert("Tüm veriler temizlendi.");
         } catch (e) { console.error(e); } 
-        finally { setDbLoading(false); }
+        finally { setDbLoading(false); setConfirmModal({ ...confirmModal, open: false }); }
     };
+
+    // Buton tıklamaları artık modalı açıyor
+    const openSeedModal = () => setConfirmModal({
+        open: true, type: 'warning', title: 'Örnek Veri Yükle',
+        message: 'Mevcut verilerin üzerine örnek veriler (MASALAR DAHİL) eklenecek. Devam edilsin mi?',
+        action: seedDemoData
+    });
+
+    const openResetModal = () => setConfirmModal({
+        open: true, type: 'danger', title: 'Tüm Verileri Sil',
+        message: '⚠️ DİKKAT: TÜM VERİLER SİLİNECEK! Bu işlem geri alınamaz. Emin misiniz?',
+        action: handleHardReset
+    });
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+             
+             {/* 👇 ONAY MODALI */}
+             <ConfirmationModal 
+                isOpen={confirmModal.open}
+                onClose={() => setConfirmModal({ ...confirmModal, open: false })}
+                onConfirm={confirmModal.action}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+                loading={dbLoading}
+             />
+
              <div className="flex justify-between items-center">
                 <div><h2 className="text-2xl font-bold text-white flex items-center gap-2"><SettingsIcon className="text-indigo-400"/> Ayarlar</h2><p className="text-sm text-slate-400">Sistem yapılandırması.</p></div>
                 <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 bg-emerald-900/20 border-emerald-500/30`}><div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div><div><p className="text-xs font-bold text-emerald-400">SİSTEM AKTİF</p><p className="text-[10px] text-slate-500">Veriler güvende.</p></div></div>
@@ -114,8 +128,9 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
              <div className="border border-red-500/20 bg-red-900/5 p-6 rounded-2xl">
                 <h3 className="font-bold text-red-400 mb-2 flex items-center gap-2"><Database size={18}/> Veri Yönetimi</h3>
                 <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                    <button onClick={seedDemoData} disabled={dbLoading} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-slate-600">{dbLoading ? <Loader2 className="animate-spin"/> : <Database size={16}/>} Örnek Veri & Masaları Yükle</button>
-                    <button onClick={handleHardReset} disabled={dbLoading} className="flex-1 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-500 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-red-500/50">{dbLoading ? <Loader2 className="animate-spin"/> : <Trash2 size={16}/>} Tümünü Sil</button>
+                    {/* 👇 Butonlar open...Modal fonksiyonlarını çağırıyor */}
+                    <button onClick={openSeedModal} disabled={dbLoading} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-slate-600">{dbLoading ? <Loader2 className="animate-spin"/> : <Database size={16}/>} Örnek Veri & Masaları Yükle</button>
+                    <button onClick={openResetModal} disabled={dbLoading} className="flex-1 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-500 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-red-500/50">{dbLoading ? <Loader2 className="animate-spin"/> : <Trash2 size={16}/>} Tümünü Sil</button>
                 </div>
              </div>
         </div>

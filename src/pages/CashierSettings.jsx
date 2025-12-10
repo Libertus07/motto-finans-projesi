@@ -1,30 +1,31 @@
+// pages/CashierSettings.jsx (MODAL EKLENMİŞ HALİ)
+
 import React, { useState } from 'react';
 import { User, Shield, Info, LogOut, RefreshCw, Loader2 } from 'lucide-react';
-import { writeBatch, doc, collection } from 'firebase/firestore'; // Firebase eklendi
-import { db, appId, auth } from '../services/firebase'; // Bağlantı eklendi
-import { INITIAL_TABLES } from '../utils/constants'; // Masa verisi eklendi
+import { writeBatch, doc, collection } from 'firebase/firestore'; 
+import { db, appId, auth } from '../services/firebase'; 
+import { INITIAL_TABLES } from '../utils/constants'; 
+import ConfirmationModal from '../components/ConfirmationModal'; // 👇 MODAL IMPORT
 
 const CashierSettings = () => {
     const [loading, setLoading] = useState(false);
+    // 👇 Modal State'i
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     
     const handleLogout = () => {
         window.location.reload();
     };
 
-    // --- SADECE MASALARI YENİLEME FONKSİYONU ---
+    // Modal onayladıktan sonra çalışacak fonksiyon
     const handleRefreshTables = async () => {
-        if (!window.confirm("Masalar yeniden yapılandırılacak (Mevcut siparişler silinebilir). Onaylıyor musun?")) return;
-        
         setLoading(true);
         const user = auth.currentUser;
         
         try {
             const batch = writeBatch(db);
-            // Sadece masaları tekrar yazıyoruz
             INITIAL_TABLES.forEach(t => {
                 batch.set(doc(db, 'artifacts', appId, 'users', user.uid, 'tables', t.id), t);
             });
-            
             await batch.commit();
             alert("✅ Masalar başarıyla güncellendi!");
         } catch (error) {
@@ -32,11 +33,24 @@ const CashierSettings = () => {
             alert("Hata oluştu: " + error.message);
         } finally {
             setLoading(false);
+            setIsConfirmOpen(false);
         }
     };
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-right duration-500">
+            
+            {/* 👇 ONAY MODALI */}
+            <ConfirmationModal
+                isOpen={isConfirmOpen}
+                onClose={() => setIsConfirmOpen(false)}
+                onConfirm={handleRefreshTables}
+                title="Masaları Yenile"
+                message="Masalar yeniden yapılandırılacak (Mevcut siparişler silinebilir). Onaylıyor musunuz?"
+                type="warning"
+                loading={loading}
+            />
+
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                     <User className="text-indigo-400"/> Personel Ayarları
@@ -79,7 +93,7 @@ const CashierSettings = () => {
                     </ul>
                 </div>
 
-                {/* Sağ: Sistem Araçları (Masa Yenileme Buraya Eklendi) */}
+                {/* Sağ: Sistem Araçları */}
                 <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col justify-between">
                     <div>
                         <h3 className="font-bold text-white mb-3 flex items-center gap-2">
@@ -89,9 +103,9 @@ const CashierSettings = () => {
                             Eğer masalar ekranda görünmüyorsa veya hatalıysa aşağıdaki butonu kullanın.
                         </p>
                         
-                        {/* 👇 MASA YENİLEME BUTONU */}
+                        {/* 👇 Buton artık modalı açıyor */}
                         <button 
-                            onClick={handleRefreshTables}
+                            onClick={() => setIsConfirmOpen(true)}
                             disabled={loading}
                             className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-500/20"
                         >
