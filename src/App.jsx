@@ -1,8 +1,7 @@
-// App.jsx (GÜNCELLEŞTİRİLMİŞ TAM İÇERİK)
+// App.jsx (3 ROLLÜ YETKİLENDİRME VE YÖNLENDİRME DÜZELTİLDİ)
 
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-// Firebase veri çekme importları hook'a taşındı, sadece auth kaldı
 import { Loader2, Menu, Coffee } from 'lucide-react';
 
 import { auth } from './services/firebase';
@@ -10,7 +9,6 @@ import { THEME } from './utils/constants';
 
 import Sidebar from './components/Sidebar';
 import AuthScreen from './components/AuthScreen';
-// 👇 Yeni Hook'u import et
 import useFinanceData from './hooks/useFinanceData';
 
 // Sayfalar dinamik yukleniyor (Lazy Loading)
@@ -36,62 +34,53 @@ export default function PatronFinancePro() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // 👇 TÜM VERİ DURUMLARI, LISTENER'LAR VE STATS HESAPLAMALARI HOOK'A TAŞINDI
+  // Verileri Hook'tan Çek
   const {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings,
-  } = useFinanceData(user); // Hook'u kullan
+  } = useFinanceData(user); 
 
-  // 1. Auth (Anonim Kullanıcıyı Kalıcı Hale Getirme Düzeltmesi)
+  // Auth ve Yönlendirme
   useEffect(() => {
     if (userRole === null) { setLoading(false); return; }
     
+    // 👇 YÖNLENDİRME MANTIĞI GÜNCELLENDİ
     if (userRole === 'kasiyer') setActiveTab('pos');
-    else setActiveTab('dashboard');
+    else if (userRole === 'garson') setActiveTab('tables'); // Garson direkt masalara
+    else setActiveTab('dashboard'); // Patron dashboard'a
 
     const initAuth = async () => { 
-        try { 
-            // KRİTİK: Firebase'i anonim olarak başlatıyoruz.
-            // onAuthStateChanged içerisine persistence logic'i ekliyoruz.
-            await signInAnonymously(auth); 
-        } catch (e) { 
-            console.error("Anonim giriş hatası:", e); 
-        } 
+        try { await signInAnonymously(auth); } 
+        catch (e) { console.error("Anonim giriş hatası:", e); } 
     };
     initAuth();
 
-    // KRİTİK DÜZELTME: onAuthStateChanged içinde UID'yi Local Storage'a kaydetme
     return onAuthStateChanged(auth, (currentUser) => { 
         if (currentUser) {
-            // Mevcut veya yeni anonim UID'yi Local Storage'a kaydet
             localStorage.setItem('motto_anon_uid', currentUser.uid);
         } else {
-             // Oturum kapandıysa UID'yi temizle (gerekirse)
              localStorage.removeItem('motto_anon_uid');
         }
         setUser(currentUser); 
         setLoading(false); 
     });
   }, [userRole]);
-
-  // 2. Veri Çekme (TÜMÜ HOOK'A TAŞINDI, BU BÖLÜM SİLİNDİ)
-
-  // 3. Istatistikler (TÜMÜ HOOK'A TAŞINDI, BU BÖLÜM SİLİNDİ)
-
-  // 4. Diğer Hesaplamalar (TÜMÜ HOOK'A TAŞINDI, BU BÖLÜM SİLİNDİ)
   
   const renderContent = () => {
-    // KASİYER YETKİ KONTROLÜ
-    if (userRole === 'kasiyer') {
-        const restrictedTabs = ['dashboard', 'recipe', 'investments', 'stats', 'assistant', 'zreport']; 
+    // 👇 YETKİ KONTROLÜ (Kasiyer ve Garson)
+    if (userRole === 'kasiyer' || userRole === 'garson') {
+        // İzin verilen sekmeler listesi
+        const allowedTabs = userRole === 'garson' 
+            ? ['tables', 'products'] // Garson sadece Masa ve Menü
+            : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; // Kasiyer
         
-        if (restrictedTabs.includes(activeTab)) {
+        if (!allowedTabs.includes(activeTab)) {
              return (
                 <div className="flex flex-col items-center justify-center h-[50vh] text-slate-500 space-y-4">
                     <div className="p-4 bg-slate-800 rounded-full"><Coffee size={40} className="text-slate-600"/></div>
-                    <p>Bu alana sadece Patron erisebilir.</p>
-                    <button onClick={() => setActiveTab('pos')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Satis Ekranina Don</button>
+                    <p>Bu alana erişim yetkiniz yok.</p>
+                    <button onClick={() => setActiveTab(userRole === 'garson' ? 'tables' : 'pos')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Ana Ekrana Dön</button>
                 </div>
              );
         }
@@ -99,7 +88,6 @@ export default function PatronFinancePro() {
 
     switch (activeTab) {
       case 'dashboard':
-        // getProfitabilityWarnings fonksiyonunu hook'tan alıp Products'ı parametre olarak gönderiyoruz.
         return <Dashboard stats={stats} transactions={transactions} monthlyGoal={monthlyGoal} calculateFutureCashflow={calculateFutureCashflow} getProfitabilityWarnings={() => getProfitabilityWarnings(products)} tables={tables}/>;
       
       case 'zreport':
@@ -109,7 +97,8 @@ export default function PatronFinancePro() {
         return <CashierPOS products={products} ingredients={ingredients} />; 
 
       case 'tables':
-        return <Tables tables={tables} products={products} ingredients={ingredients} />;
+        // 👇 userRole prop'u eklendi (Garsonun ödeme alamaması için)
+        return <Tables tables={tables} products={products} ingredients={ingredients} userRole={userRole} />;
 
       case 'transactions':
         return <Transactions transactions={transactions} quickActions={quickActions} isPatron={userRole === 'patron'}/>;
@@ -118,7 +107,8 @@ export default function PatronFinancePro() {
         return <Debts debts={debts} stats={stats} />;
 
       case 'products':
-          return <Products products={products} isPatron={userRole === 'patron'} />;
+          // 👇 userRole prop'u eklendi
+          return <Products products={products} isPatron={userRole === 'patron'} userRole={userRole} />;
 
       case 'inventory': 
           return <Inventory ingredients={ingredients} debts={debts} />;
@@ -154,6 +144,7 @@ export default function PatronFinancePro() {
       <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-800 rounded-lg text-white shadow-lg border border-slate-700"><Menu size={24} /></button>
       <div className={`fixed inset-0 bg-black/50 z-40 md:hidden ${isMobileMenuOpen ? 'block' : 'hidden'}`} onClick={() => setIsMobileMenuOpen(false)}></div>
       
+      {/* 👇 userRole prop'u eklendi */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isMobile={!isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} userRole={userRole} />
 
       <main className={`flex-1 h-screen overflow-y-auto w-full relative ${isMobileMenuOpen ? 'overflow-hidden' : ''}`}>

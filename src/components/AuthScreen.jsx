@@ -1,49 +1,50 @@
-// components/AuthScreen.jsx (ŞİFRE SIFIRLAMA EKLENMİŞ SON HALİ)
+// components/AuthScreen.jsx (3 ROLLÜ SİSTEM)
 
 import React, { useState, useEffect } from 'react';
-import { User, ShieldCheck, Lock, Delete, ArrowRight, X, KeyRound, LogIn, Coffee, ChevronLeft, Loader2, Mail, RefreshCw } from 'lucide-react';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'; // 👇 sendPasswordResetEmail Eklendi
+import { User, ShieldCheck, Lock, Delete, ArrowRight, X, KeyRound, LogIn, Coffee, ChevronLeft, UtensilsCrossed, Loader2, Mail } from 'lucide-react'; // UtensilsCrossed eklendi
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { THEME } from '../utils/constants';
 
 const AuthScreen = ({ setUserRole }) => {
-    const [step, setStep] = useState('select'); // 'select' | 'input' | 'forgot'
+    const [step, setStep] = useState('select'); 
     const [selectedRole, setSelectedRole] = useState(null);
-    
-    // Kasiyer PIN State'i
     const [pin, setPin] = useState('');
     
-    // Patron Giriş State'leri
+    // Patron Login State
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
     const [error, setError] = useState('');
-    const [successMsg, setSuccessMsg] = useState(''); // Başarı mesajı için
+    const [successMsg, setSuccessMsg] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Kasiyer için basit yerel şifre
-    const CASHIER_PIN = '1234';
+    // 🔐 ŞİFRELER / PIN KODLARI
+    const PINS = {
+        'kasiyer': '1234',
+        'garson': '1111'  // 👇 Garson Şifresi
+    };
 
     const handleRoleSelect = (role) => {
         setSelectedRole(role);
         setStep('input');
         setPin('');
-        // setEmail(''); // E-postayı silmiyoruz, belki lazım olur
+        setEmail('');
         setPassword('');
         setError('');
         setSuccessMsg('');
     };
 
-    // --- KASİYER GİRİŞİ ---
+    // --- PIN GİRİŞİ (KASİYER VE GARSON) ---
     const handlePinInput = (num) => {
-        if (selectedRole === 'kasiyer' && pin.length < 4) {
+        if ((selectedRole === 'kasiyer' || selectedRole === 'garson') && pin.length < 4) {
             const newPin = pin + num;
             setPin(newPin);
             if (newPin.length === 4) {
-                if (newPin === CASHIER_PIN) {
-                    setUserRole('kasiyer');
+                if (newPin === PINS[selectedRole]) {
+                    setUserRole(selectedRole);
                 } else {
-                    setError('Hatalı Kasiyer Kodu');
+                    setError('Hatalı Personel Kodu');
                     setTimeout(() => { setPin(''); setError(''); }, 1000);
                 }
             }
@@ -58,53 +59,36 @@ const AuthScreen = ({ setUserRole }) => {
     const handleAdminLogin = async (e) => {
         if (e) e.preventDefault();
         if (!email || !password) return setError('Lütfen bilgileri giriniz.');
-
         setLoading(true);
         setError('');
-
         try {
             await signInWithEmailAndPassword(auth, email, password);
             setUserRole('patron'); 
         } catch (err) {
-            console.error("Giriş Hatası:", err.code);
-            if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-                setError('E-posta veya Şifre Hatalı!');
-            } else if (err.code === 'auth/too-many-requests') {
-                setError('Çok fazla deneme yaptınız. Biraz bekleyin.');
-            } else {
-                setError('Giriş başarısız. Bağlantınızı kontrol edin.');
-            }
+            setError('Giriş başarısız. Bilgileri kontrol edin.');
         } finally {
             setLoading(false);
         }
     };
 
-    // 👇 ŞİFRE SIFIRLAMA FONKSİYONU
     const handleForgotPassword = async (e) => {
         if (e) e.preventDefault();
-        if (!email) return setError('Lütfen e-posta adresinizi girin.');
-
+        if (!email) return setError('Lütfen e-posta girin.');
         setLoading(true);
-        setError('');
-        setSuccessMsg('');
-
         try {
             await sendPasswordResetEmail(auth, email);
-            setSuccessMsg('Sıfırlama bağlantısı e-postanıza gönderildi! Lütfen gelen kutunuzu (ve spam klasörünü) kontrol edin.');
+            setSuccessMsg('Sıfırlama linki gönderildi.');
         } catch (err) {
-            console.error("Sıfırlama Hatası:", err);
-            if (err.code === 'auth/user-not-found') setError('Bu e-posta ile kayıtlı kullanıcı bulunamadı.');
-            else if (err.code === 'auth/invalid-email') setError('Geçersiz e-posta formatı.');
-            else setError('Bir hata oluştu. Lütfen tekrar deneyin.');
+            setError('Hata oluştu.');
         } finally {
             setLoading(false);
         }
     };
 
-    // Klavye Dinleyicileri
+    // Klavye Dinleyicisi (Kasiyer ve Garson için)
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
-            if (step === 'input' && selectedRole === 'kasiyer') {
+            if (step === 'input' && (selectedRole === 'kasiyer' || selectedRole === 'garson')) {
                 if (/^\d$/.test(e.key)) handlePinInput(e.key);
                 else if (e.key === 'Backspace') handleDelete();
             }
@@ -113,138 +97,111 @@ const AuthScreen = ({ setUserRole }) => {
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, [step, selectedRole, pin]);
 
+    // Renk Temaları
+    const getTheme = () => {
+        if (selectedRole === 'patron') return { color: 'text-amber-400', bg: 'bg-amber-500', border: 'border-amber-500' };
+        if (selectedRole === 'kasiyer') return { color: 'text-cyan-400', bg: 'bg-cyan-500', border: 'border-cyan-500' };
+        return { color: 'text-rose-400', bg: 'bg-rose-500', border: 'border-rose-500' }; // Garson (Rose)
+    };
+    const theme = getTheme();
+
     return (
         <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden font-sans">
-            
-            {/* Arka Plan */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] animate-pulse"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-amber-600/5 rounded-full blur-[120px] animate-pulse" style={{animationDelay: '2s'}}></div>
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
             </div>
 
             <div className="relative z-10 w-full max-w-[420px]">
-                
                 {/* LOGO */}
-                <div className="text-center mb-8 space-y-3 animate-in slide-in-from-top-4 duration-700">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-2xl mb-2">
-                        <Coffee size={32} className="text-white drop-shadow-lg" />
+                <div className="text-center mb-6 space-y-2 animate-in slide-in-from-top-4 duration-700">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-2xl mb-1">
+                        <Coffee size={28} className="text-white drop-shadow-lg" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">
-                            MOTTO <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">COFFEE</span>
-                        </h1>
-                        <p className="text-slate-500 text-[10px] tracking-[0.3em] uppercase font-bold mt-2">Kurumsal Yönetim Sistemi</p>
+                        <h1 className="text-2xl font-black text-white tracking-tight">MOTTO <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">COFFEE</span></h1>
+                        <p className="text-slate-500 text-[10px] tracking-[0.3em] uppercase font-bold">Kurumsal Yönetim Sistemi</p>
                     </div>
                 </div>
 
                 {/* ADIM 1: ROL SEÇİMİ */}
                 {step === 'select' && (
-                    <div className="space-y-4 animate-in zoom-in-95 duration-500">
-                        <button onClick={() => handleRoleSelect('patron')} className="w-full group relative bg-gradient-to-b from-slate-800/80 to-slate-900/80 backdrop-blur-md border border-slate-700 hover:border-amber-500/50 p-1 rounded-2xl transition-all duration-300 hover:shadow-2xl hover:shadow-amber-900/10 hover:-translate-y-1">
-                            <div className="flex items-center gap-5 p-5 rounded-xl bg-slate-900/50">
-                                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform duration-300"><ShieldCheck size={24} className="text-amber-400" /></div>
-                                <div className="text-left flex-1"><h3 className="text-lg font-bold text-white group-hover:text-amber-400 transition-colors">Yönetici Girişi</h3><p className="text-xs text-slate-500 font-medium">Tam Yetkili Erişim (E-mail)</p></div>
-                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-amber-500 group-hover:text-white transition-all"><ArrowRight size={14} /></div>
+                    <div className="space-y-3 animate-in zoom-in-95 duration-500">
+                        {/* Patron */}
+                        <button onClick={() => handleRoleSelect('patron')} className="w-full group bg-slate-800/80 border border-slate-700 hover:border-amber-500/50 p-1 rounded-2xl transition-all hover:scale-[1.02]">
+                            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/50">
+                                <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center border border-amber-500/20"><ShieldCheck size={20} className="text-amber-400" /></div>
+                                <div className="text-left flex-1"><h3 className="font-bold text-white group-hover:text-amber-400">Yönetici</h3><p className="text-[10px] text-slate-500">Tam Yetki</p></div>
+                                <ArrowRight size={16} className="text-slate-600 group-hover:text-amber-400"/>
                             </div>
                         </button>
 
-                        <button onClick={() => handleRoleSelect('kasiyer')} className="w-full group relative bg-gradient-to-b from-slate-800/80 to-slate-900/80 backdrop-blur-md border border-slate-700 hover:border-cyan-500/50 p-1 rounded-2xl transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-900/10 hover:-translate-y-1">
-                            <div className="flex items-center gap-5 p-5 rounded-xl bg-slate-900/50">
-                                <div className="w-12 h-12 rounded-full bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 group-hover:scale-110 transition-transform duration-300"><User size={24} className="text-cyan-400" /></div>
-                                <div className="text-left flex-1"><h3 className="text-lg font-bold text-white group-hover:text-cyan-400 transition-colors">Personel Girişi</h3><p className="text-xs text-slate-500 font-medium">Satış Terminali (PIN)</p></div>
-                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-cyan-500 group-hover:text-white transition-all"><ArrowRight size={14} /></div>
+                        {/* Kasiyer */}
+                        <button onClick={() => handleRoleSelect('kasiyer')} className="w-full group bg-slate-800/80 border border-slate-700 hover:border-cyan-500/50 p-1 rounded-2xl transition-all hover:scale-[1.02]">
+                            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/50">
+                                <div className="w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20"><User size={20} className="text-cyan-400" /></div>
+                                <div className="text-left flex-1"><h3 className="font-bold text-white group-hover:text-cyan-400">Kasiyer</h3><p className="text-[10px] text-slate-500">Satış & Kasa</p></div>
+                                <ArrowRight size={16} className="text-slate-600 group-hover:text-cyan-400"/>
+                            </div>
+                        </button>
+
+                        {/* 👇 GARSON BUTONU (YENİ) */}
+                        <button onClick={() => handleRoleSelect('garson')} className="w-full group bg-slate-800/80 border border-slate-700 hover:border-rose-500/50 p-1 rounded-2xl transition-all hover:scale-[1.02]">
+                            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/50">
+                                <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20"><UtensilsCrossed size={20} className="text-rose-400" /></div>
+                                <div className="text-left flex-1"><h3 className="font-bold text-white group-hover:text-rose-400">Garson</h3><p className="text-[10px] text-slate-500">Sipariş & Servis</p></div>
+                                <ArrowRight size={16} className="text-slate-600 group-hover:text-rose-400"/>
                             </div>
                         </button>
                     </div>
                 )}
 
-                {/* ADIM 2: GİRİŞ FORMLARI */}
+                {/* ADIM 2: GİRİŞ FORMU */}
                 {step === 'input' && (
-                    <div className="relative bg-slate-900/60 backdrop-blur-2xl border border-slate-700/50 p-1 rounded-3xl shadow-2xl animate-in slide-in-from-right-8 duration-500 ring-1 ring-white/5">
-                        <div className="bg-slate-950/50 p-8 rounded-[20px] relative overflow-hidden">
-                            <button onClick={() => setStep('select')} className="absolute top-4 left-4 text-slate-500 hover:text-white transition-colors flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg hover:bg-white/5"><ChevronLeft size={14} /> GERİ</button>
+                    <div className="relative bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 p-6 rounded-3xl shadow-2xl animate-in slide-in-from-right-8 duration-500">
+                        <button onClick={() => setStep('select')} className="mb-6 text-slate-500 hover:text-white flex items-center gap-1 text-xs font-bold"><ChevronLeft size={14} /> GERİ</button>
 
-                            <div className="text-center mb-8 mt-4">
-                                <div className={`inline-flex items-center justify-center w-14 h-14 rounded-full mb-3 ${selectedRole === 'patron' ? 'bg-amber-500/10 text-amber-400' : 'bg-cyan-500/10 text-cyan-400'} ring-1 ring-white/10`}><Lock size={24} /></div>
-                                <h2 className="text-xl font-bold text-white">{selectedRole === 'patron' ? 'Yönetici Doğrulama' : 'Personel Doğrulama'}</h2>
-                            </div>
-
-                            {/* KASİYER (PIN) */}
-                            {selectedRole === 'kasiyer' && (
-                                <>
-                                    <div className="flex justify-center gap-4 mb-8">{[...Array(4)].map((_, i) => ( <div key={i} className={`w-3 h-3 rounded-full transition-all duration-300 ${i < pin.length ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)] scale-125' : 'bg-slate-700'}`}/> ))}</div>
-                                    {error && <div className="text-red-400 text-center text-xs font-bold mb-4 bg-red-500/10 py-2 rounded-lg animate-shake">{error}</div>}
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((num) => (
-                                            <button key={num} onClick={() => handlePinInput(num.toString())} className={`h-14 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xl font-bold transition-all active:scale-95 border border-slate-700 hover:border-slate-500 shadow-lg ${num === 0 ? 'col-start-2' : ''}`}>{num}</button>
-                                        ))}
-                                        <button onClick={handleDelete} className="h-14 rounded-xl bg-red-900/20 hover:bg-red-900/40 text-red-400 flex items-center justify-center transition-all active:scale-95 border border-red-500/20 col-start-3 row-start-4"><Delete size={20} /></button>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* PATRON (E-POSTA & ŞİFRE) */}
-                            {selectedRole === 'patron' && (
-                                <form onSubmit={handleAdminLogin} className="space-y-4">
-                                    <div className="space-y-4">
-                                        <div className="relative group">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-500 transition-colors" size={18}/>
-                                            <input type="email" placeholder="Yönetici E-postası" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-900 text-white pl-12 pr-4 py-4 rounded-xl outline-none border border-slate-700 focus:border-amber-500/50 placeholder:text-slate-600 transition-all text-sm"/>
-                                        </div>
-                                        <div className="relative group">
-                                            <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-500 transition-colors" size={18}/>
-                                            <input type="password" placeholder="Güvenli Şifre" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-900 text-white pl-12 pr-4 py-4 rounded-xl outline-none border border-slate-700 focus:border-amber-500/50 placeholder:text-slate-600 transition-all text-sm"/>
-                                        </div>
-                                    </div>
-                                    
-                                    {error && <div className="text-red-400 text-center text-xs font-bold bg-red-500/10 py-3 rounded-lg border border-red-500/20 animate-shake">{error}</div>}
-
-                                    <div className="flex flex-col gap-3">
-                                        <button type="submit" disabled={loading} className="w-full py-4 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg shadow-amber-900/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group">
-                                            {loading ? <Loader2 className="animate-spin" size={20}/> : <><LogIn size={18} className="group-hover:translate-x-1 transition-transform"/> GÜVENLİ GİRİŞ YAP</>}
-                                        </button>
-                                        
-                                        {/* 👇 ŞİFREMİ UNUTTUM LİNKİ */}
-                                        <button type="button" onClick={() => { setStep('forgot'); setError(''); setSuccessMsg(''); }} className="text-xs text-slate-500 hover:text-amber-400 transition-colors text-center py-2">
-                                            Şifrenizi mi unuttunuz?
-                                        </button>
-                                    </div>
-                                </form>
-                            )}
+                        <div className="text-center mb-6">
+                            <h2 className="text-xl font-bold text-white capitalize">{selectedRole} Girişi</h2>
+                            <p className="text-xs text-slate-400">Giriş yapmak için doğrulama yapın</p>
                         </div>
-                    </div>
-                )}
 
-                {/* ADIM 3: ŞİFRE SIFIRLAMA */}
-                {step === 'forgot' && (
-                    <div className="relative bg-slate-900/60 backdrop-blur-2xl border border-slate-700/50 p-1 rounded-3xl shadow-2xl animate-in slide-in-from-right-8 duration-500 ring-1 ring-white/5">
-                        <div className="bg-slate-950/50 p-8 rounded-[20px] relative overflow-hidden">
-                            <button onClick={() => setStep('input')} className="absolute top-4 left-4 text-slate-500 hover:text-white transition-colors flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg hover:bg-white/5"><ChevronLeft size={14} /> GİRİŞE DÖN</button>
-
-                            <div className="text-center mb-6 mt-4">
-                                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full mb-3 bg-blue-500/10 text-blue-400 ring-1 ring-white/10"><RefreshCw size={24} /></div>
-                                <h2 className="text-xl font-bold text-white">Şifre Sıfırlama</h2>
-                                <p className="text-xs text-slate-400 mt-1">E-posta adresinize sıfırlama bağlantısı gönderilecek.</p>
-                            </div>
-
-                            <form onSubmit={handleForgotPassword} className="space-y-4">
-                                <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={18}/>
-                                    <input type="email" placeholder="Kayıtlı E-posta Adresi" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-900 text-white pl-12 pr-4 py-4 rounded-xl outline-none border border-slate-700 focus:border-blue-500/50 placeholder:text-slate-600 transition-all text-sm"/>
+                        {/* PIN GİRİŞİ (Kasiyer & Garson) */}
+                        {(selectedRole === 'kasiyer' || selectedRole === 'garson') && (
+                            <>
+                                <div className="flex justify-center gap-3 mb-6">{[...Array(4)].map((_, i) => ( <div key={i} className={`w-3 h-3 rounded-full transition-all duration-300 ${i < pin.length ? `${theme.bg} shadow-lg scale-125` : 'bg-slate-700'}`}/> ))}</div>
+                                {error && <div className="text-red-400 text-center text-xs font-bold mb-4 animate-pulse">{error}</div>}
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((num) => (
+                                        <button key={num} onClick={() => handlePinInput(num.toString())} className={`h-12 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-lg font-bold border border-slate-700 active:scale-95 ${num === 0 ? 'col-start-2' : ''}`}>{num}</button>
+                                    ))}
+                                    <button onClick={handleDelete} className="h-12 rounded-lg bg-red-900/20 text-red-400 flex items-center justify-center border border-red-500/20 col-start-3 row-start-4 active:scale-95"><Delete size={18} /></button>
                                 </div>
+                            </>
+                        )}
 
-                                {error && <div className="text-red-400 text-center text-xs font-bold bg-red-500/10 py-3 rounded-lg border border-red-500/20">{error}</div>}
-                                {successMsg && <div className="text-emerald-400 text-center text-xs font-bold bg-emerald-500/10 py-3 rounded-lg border border-emerald-500/20">{successMsg}</div>}
-
-                                <button type="submit" disabled={loading} className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
-                                    {loading ? <Loader2 className="animate-spin" size={20}/> : 'SIFIRLAMA LİNKİ GÖNDER'}
-                                </button>
+                        {/* PATRON GİRİŞİ */}
+                        {selectedRole === 'patron' && step !== 'forgot' && (
+                            <form onSubmit={handleAdminLogin} className="space-y-3">
+                                <input type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-amber-500 outline-none"/>
+                                <input type="password" placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-amber-500 outline-none"/>
+                                {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+                                <button type="submit" disabled={loading} className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2">{loading ? <Loader2 className="animate-spin"/> : 'GİRİŞ YAP'}</button>
+                                <button type="button" onClick={() => { setStep('forgot'); setSuccessMsg(''); setError(''); }} className="text-[10px] text-slate-500 w-full text-center hover:text-white mt-2">Şifremi Unuttum</button>
                             </form>
-                        </div>
+                        )}
+
+                        {/* ŞİFRE SIFIRLAMA */}
+                        {step === 'forgot' && (
+                            <div className="space-y-3">
+                                <input type="email" placeholder="Kayıtlı E-posta" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-blue-500 outline-none"/>
+                                {successMsg && <p className="text-emerald-400 text-xs text-center">{successMsg}</p>}
+                                {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+                                <button onClick={handleForgotPassword} disabled={loading} className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2">{loading ? <Loader2 className="animate-spin"/> : 'LİNK GÖNDER'}</button>
+                            </div>
+                        )}
                     </div>
                 )}
-
             </div>
         </div>
     );

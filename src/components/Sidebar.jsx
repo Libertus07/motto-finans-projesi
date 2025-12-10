@@ -1,3 +1,5 @@
+// components/Sidebar.jsx (GARSON RENGİ VE YETKİSİ EKLENMİŞ HALİ)
+
 import React from 'react';
 import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid, Package } from 'lucide-react';
 import { THEME } from '../utils/constants';
@@ -6,24 +8,22 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
   const menuItems = [
     // 1. PATRON ÖZEL
     { id: 'dashboard', label: 'Genel Bakış', icon: LayoutDashboard, roles: ['patron'] },
-
-    // 2. YENİ EKLENEN RAPOR (SADECE PATRON)
     { id: 'zreport', label: 'Z Raporu', icon: FileText, roles: ['patron'] },
     
-    // 3. SATIŞ EKRANI (AYRI)
+    // 2. SATIŞ EKRANI
     { id: 'pos', label: 'Satış Terminali (POS)', icon: Calculator, roles: ['patron', 'kasiyer'] },
 
-    // 4. MASA YÖNETİMİ EKRANI (AYRI)
-    { id: 'tables', label: 'Masa Yönetimi', icon: LayoutGrid, roles: ['patron', 'kasiyer'] },
+    // 3. MASA YÖNETİMİ (Garson Burayı Görebilir)
+    { id: 'tables', label: 'Masa Yönetimi', icon: LayoutGrid, roles: ['patron', 'kasiyer', 'garson'] },
     
-    // 5. GELİR-GİDER EKRANI (AYRI)
+    // 4. FİNANSAL İŞLEMLER
     { id: 'transactions', label: 'Kasa Hareketleri', icon: Wallet, roles: ['patron', 'kasiyer'] },
-
-    // 6. BORÇ EKRANI (AYRI)
     { id: 'debts', label: 'Veresiye Defteri', icon: FileText, roles: ['patron', 'kasiyer'] }, 
     
-    // Diğerleri...
-    { id: 'products', label: 'Menü & Ürün', icon: Coffee, roles: ['patron', 'kasiyer'] },
+    // 5. ÜRÜN VE STOK (Garson Menüyü Görebilir)
+    { id: 'products', label: 'Menü & Ürün', icon: Coffee, roles: ['patron', 'kasiyer', 'garson'] },
+    
+    // 6. YÖNETİMSEL
     { id: 'inventory', label: 'Stok & Tedarikçi', icon: Package, roles: ['patron'] },
     { id: 'recipe', label: 'Maliyet', icon: ChefHat, roles: ['patron'] },
     { id: 'investments', label: 'Yatırımlar', icon: Coins, roles: ['patron'] },
@@ -34,6 +34,16 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
 
   const visibleItems = menuItems.filter(item => item.roles.includes(userRole));
 
+  // 👇 Rol Rengi ve Yazısını Belirleyen Yardımcı Fonksiyon
+  const getRoleUI = () => {
+      if (userRole === 'patron') return { color: 'bg-indigo-700', label: 'Patron', desc: 'Tam Yetki' };
+      if (userRole === 'kasiyer') return { color: 'bg-emerald-700', label: 'Kasiyer', desc: 'Satış & Kasa' };
+      // Varsayılan (Garson)
+      return { color: 'bg-rose-700', label: 'Garson', desc: 'Sipariş & Servis' };
+  };
+
+  const roleUI = getRoleUI();
+
   return (
     <div className={`fixed inset-y-0 left-0 z-50 w-64 ${THEME.bg} border-r ${THEME.border} transition-transform duration-300 transform ${isMobile ? '-translate-x-full' : 'translate-x-0'} md:translate-x-0 md:static flex flex-col`}>
       <div className="p-6 flex items-center gap-3 border-b border-slate-800">
@@ -43,6 +53,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
           <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Yönetim Paneli</p>
         </div>
       </div>
+      
       <div className="flex-1 overflow-y-auto py-4 space-y-1 px-3 custom-scrollbar">
         {visibleItems.map(item => (
           <button
@@ -56,12 +67,16 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
           </button>
         ))}
       </div>
+
+      {/* 👇 GÜNCELLENMİŞ PROFİL KISMI */}
       <div className="p-4 border-t border-slate-800">
         <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 flex items-center gap-3">
-          <div className={`p-2 rounded-full ${userRole === 'patron' ? 'bg-indigo-700' : 'bg-emerald-700'}`}><User size={16} className="text-white"/></div>
+          <div className={`p-2 rounded-full ${roleUI.color}`}>
+            <User size={16} className="text-white"/>
+          </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-bold text-white truncate">{userRole === 'patron' ? 'Patron' : 'Kasiyer'}</p>
-            <p className="text-[10px] text-slate-500 truncate">{userRole === 'patron' ? 'Tam Yetki' : 'Satış & Kasa'}</p>
+            <p className="text-xs font-bold text-white truncate">{roleUI.label}</p>
+            <p className="text-[10px] text-slate-500 truncate">{roleUI.desc}</p>
           </div>
         </div>
       </div>

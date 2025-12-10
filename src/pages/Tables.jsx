@@ -1,7 +1,7 @@
-// pages/Tables.jsx (MOBİL UYUMLU VERSİYON)
+// pages/Tables.jsx (GARSON YETKİ KISITLAMASI VE MOBİL UYUM EKLENMİŞ HALİ)
 
 import React, { useState, useEffect } from 'react';
-import { Table as TableIcon, Coffee, Trash2, Printer, CheckCircle2, CreditCard, Banknote, X, Sun, Cloud, Home, ArrowUp, Move } from 'lucide-react';
+import { Table as TableIcon, Coffee, Trash2, Printer, CheckCircle2, CreditCard, Banknote, X, Sun, Cloud, Home, ArrowUp, Move, AlertTriangle } from 'lucide-react';
 import { addDoc, doc, updateDoc, collection, writeBatch } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
@@ -11,7 +11,7 @@ import TableTransferModal from '../components/TableTransferModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TableCloseModal from '../components/TableCloseModal';
 
-const Tables = ({ tables, products }) => {
+const Tables = ({ tables, products, userRole }) => { // 👇 userRole eklendi
     const [selectedTable, setSelectedTable] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState('Tümü');
     const [activeZone, setActiveZone] = useState('Tümü');
@@ -33,7 +33,6 @@ const Tables = ({ tables, products }) => {
         { key: 'iban', label: 'Diğer Banka / IBAN' }
     ];
 
-    // Veritabanı ile Local State Senkronizasyonu
     useEffect(() => {
         if (!selectedTable || !tables || tables.length === 0) return;
         const latestTable = tables.find(t => t.id === selectedTable.id);
@@ -172,7 +171,6 @@ const Tables = ({ tables, products }) => {
             <TableCloseModal isOpen={isCloseModalOpen} onClose={() => setIsCloseModalOpen(false)} onConfirm={confirmCloseTable} tableName={selectedTable?.name} amount={selectedTable?.total} method={paymentMethod} bank={cardBank} loading={processing}/>
 
             {/* SOL KISIM: MASA LİSTESİ */}
-            {/* Mobilde: Eğer masa seçiliyse bu kısım gizlenir. Desktopta: Hep görünür. */}
             <div className={`flex-1 overflow-y-auto p-4 md:p-8 ${selectedTable ? 'hidden md:block' : 'block'}`}>
                 <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3"><TableIcon size={28}/> Masalar</h2>
                 <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-800 pb-4">
@@ -192,7 +190,6 @@ const Tables = ({ tables, products }) => {
             </div>
 
             {/* SAĞ KISIM: DETAY VE İŞLEM */}
-            {/* Mobilde: Sadece masa seçiliyse görünür ve tam ekran olur. Desktopta: Yan panel olur. */}
             {selectedTable ? (
                 <div className={`${THEME.card} w-full md:w-[420px] shrink-0 border-l ${THEME.border} flex flex-col absolute md:static inset-0 z-20`}>
                     <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
@@ -224,22 +221,37 @@ const Tables = ({ tables, products }) => {
                             ))
                         ) : <div className="text-center py-10 text-slate-600"><Coffee size={32} className="mx-auto mb-2"/><p>Bu masada sipariş yok.</p></div>}
                     </div>
+                    
+                    {/* 👇 ÖDEME KISMI (GARSON KONTROLÜ) */}
                     <div className="p-5 bg-slate-900 border-t border-slate-800">
                         <div className="flex justify-between items-end mb-4"><span className="text-slate-400 text-sm mb-1 block">Toplam Tutar</span><span className="text-4xl font-extrabold text-white tracking-tight">{formatCurrency(selectedTable.total)} <span className="text-lg text-slate-500 font-normal">₺</span></span></div>
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                            <button onClick={() => setPaymentMethod('cash')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'cash' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Banknote size={24}/> <span className="text-xs">NAKİT</span></button>
-                            <button onClick={() => setPaymentMethod('card')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'card' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><CreditCard size={24}/> <span className="text-xs">KART / BANKA</span></button>
-                        </div>
-                        {paymentMethod === 'card' && (
-                            <div className="grid grid-cols-3 gap-2 mb-3 animate-in fade-in slide-in-from-top-2">{bankOptions.map(option => ( <button key={option.key} onClick={() => setCardBank(option.key)} className={`py-2 rounded-lg text-xs font-bold transition-colors ${cardBank === option.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{option.label}</button> ))}</div>
+                        
+                        {userRole !== 'garson' ? (
+                            <>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <button onClick={() => setPaymentMethod('cash')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'cash' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Banknote size={24}/> <span className="text-xs">NAKİT</span></button>
+                                    <button onClick={() => setPaymentMethod('card')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'card' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><CreditCard size={24}/> <span className="text-xs">KART / BANKA</span></button>
+                                </div>
+                                {paymentMethod === 'card' && (
+                                    <div className="grid grid-cols-3 gap-2 mb-3 animate-in fade-in slide-in-from-top-2">{bankOptions.map(option => ( <button key={option.key} onClick={() => setCardBank(option.key)} className={`py-2 rounded-lg text-xs font-bold transition-colors ${cardBank === option.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{option.label}</button> ))}</div>
+                                )}
+                                <button onClick={handlePrintBill} disabled={selectedTable.total <= 0} className="w-full mb-3 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
+                                <button onClick={() => setIsCloseModalOpen(true)} disabled={selectedTable.total <= 0 || processing} className={`w-full py-4 rounded-xl font-bold text-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${paymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/30' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/30'} text-white flex items-center justify-center gap-2`}><CheckCircle2 size={20}/> {formatCurrency(selectedTable.total)} ₺ KAPAT</button>
+                            </>
+                        ) : (
+                            <div className="space-y-3 animate-in fade-in">
+                                <div className="p-3 bg-rose-900/20 border border-rose-500/30 rounded-xl text-center flex flex-col items-center gap-1">
+                                    <AlertTriangle size={20} className="text-rose-400 mb-1"/>
+                                    <p className="text-xs text-rose-400 font-bold">Ödeme Alma Yetkiniz Yok</p>
+                                    <p className="text-[10px] text-slate-500">Lütfen ödeme işlemleri için kasayı çağırın.</p>
+                                </div>
+                                <button onClick={handlePrintBill} disabled={selectedTable.total <= 0} className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
+                            </div>
                         )}
-                        <button onClick={handlePrintBill} disabled={selectedTable.total <= 0} className="w-full mb-3 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
-                        <button onClick={() => setIsCloseModalOpen(true)} disabled={selectedTable.total <= 0 || processing} className={`w-full py-4 rounded-xl font-bold text-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${paymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/30' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/30'} text-white flex items-center justify-center gap-2`}><CheckCircle2 size={20}/> {formatCurrency(selectedTable.total)} ₺ KAPAT</button>
                     </div>
                     <Receipt data={printData} />
                 </div>
             ) : (
-                // Masa seçili değilse Desktop'ta gösterilecek Placeholder
                 <div className="hidden md:flex w-full md:w-96 shrink-0 border-l border-slate-800 flex-col items-center justify-center text-slate-600 bg-slate-900/30">
                      <TableIcon size={48} className="mb-4 opacity-50"/>
                      <p className="text-sm font-medium">Detayları görmek için sol taraftan bir masa seçin.</p>
