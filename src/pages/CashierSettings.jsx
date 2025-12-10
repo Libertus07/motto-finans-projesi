@@ -1,22 +1,23 @@
-// pages/CashierSettings.jsx (MODAL EKLENMİŞ HALİ)
+// pages/CashierSettings.jsx (TAMAMEN PROFESYONEL)
 
 import React, { useState } from 'react';
 import { User, Shield, Info, LogOut, RefreshCw, Loader2 } from 'lucide-react';
 import { writeBatch, doc, collection } from 'firebase/firestore'; 
 import { db, appId, auth } from '../services/firebase'; 
 import { INITIAL_TABLES } from '../utils/constants'; 
-import ConfirmationModal from '../components/ConfirmationModal'; // 👇 MODAL IMPORT
+import ConfirmationModal from '../components/ConfirmationModal';
+import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
 
 const CashierSettings = () => {
     const [loading, setLoading] = useState(false);
-    // 👇 Modal State'i
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    // 👇 Info Modal State
+    const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
     
     const handleLogout = () => {
         window.location.reload();
     };
 
-    // Modal onayladıktan sonra çalışacak fonksiyon
     const handleRefreshTables = async () => {
         setLoading(true);
         const user = auth.currentUser;
@@ -27,10 +28,11 @@ const CashierSettings = () => {
                 batch.set(doc(db, 'artifacts', appId, 'users', user.uid, 'tables', t.id), t);
             });
             await batch.commit();
-            alert("✅ Masalar başarıyla güncellendi!");
+            // 👇 Alert yerine InfoModal
+            setInfoModal({ isOpen: true, type: 'success', title: 'Başarılı', message: 'Masalar varsayılan ayarlara döndürüldü ve güncellendi.' });
         } catch (error) {
             console.error(error);
-            alert("Hata oluştu: " + error.message);
+            setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: error.message });
         } finally {
             setLoading(false);
             setIsConfirmOpen(false);
@@ -40,7 +42,6 @@ const CashierSettings = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-right duration-500">
             
-            {/* 👇 ONAY MODALI */}
             <ConfirmationModal
                 isOpen={isConfirmOpen}
                 onClose={() => setIsConfirmOpen(false)}
@@ -49,6 +50,15 @@ const CashierSettings = () => {
                 message="Masalar yeniden yapılandırılacak (Mevcut siparişler silinebilir). Onaylıyor musunuz?"
                 type="warning"
                 loading={loading}
+            />
+            
+            {/* 👇 INFO MODAL EKLENDİ */}
+            <InfoModal
+                isOpen={infoModal.isOpen}
+                onClose={() => setInfoModal({ ...infoModal, isOpen: false })}
+                type={infoModal.type}
+                title={infoModal.title}
+                message={infoModal.message}
             />
 
             <div className="flex justify-between items-center mb-6">
@@ -103,7 +113,6 @@ const CashierSettings = () => {
                             Eğer masalar ekranda görünmüyorsa veya hatalıysa aşağıdaki butonu kullanın.
                         </p>
                         
-                        {/* 👇 Buton artık modalı açıyor */}
                         <button 
                             onClick={() => setIsConfirmOpen(true)}
                             disabled={loading}
@@ -116,7 +125,6 @@ const CashierSettings = () => {
                 </div>
             </div>
 
-            {/* Çıkış Yap Butonu */}
             <button 
                 onClick={handleLogout}
                 className="w-full py-4 bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 text-red-400 hover:text-red-300 font-bold rounded-xl transition-all flex items-center justify-center gap-2 group"

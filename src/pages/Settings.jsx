@@ -1,4 +1,4 @@
-// pages/Settings.jsx (MODAL EKLENMİŞ HALİ)
+// pages/Settings.jsx (TAMAMEN PROFESYONEL)
 
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, Database, Trash2, Target, Building2, User, Zap, FileText, Loader2 } from 'lucide-react';
@@ -6,14 +6,16 @@ import { doc, setDoc, writeBatch, collection, getDocs } from 'firebase/firestore
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import { INITIAL_TRANSACTIONS, INITIAL_PRODUCTS, INITIAL_DEBTS, INITIAL_INVESTMENTS, INITIAL_QUICK_ACTIONS, INITIAL_INGREDIENTS, INITIAL_NOTES, INITIAL_TABLES } from '../utils/constants';
-import ConfirmationModal from '../components/ConfirmationModal'; // 👇 MODAL IMPORT
+import ConfirmationModal from '../components/ConfirmationModal';
+import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
 
 const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) => {
     const [dbLoading, setDbLoading] = useState(false);
     const user = auth.currentUser;
     
-    // 👇 Modal State'leri
     const [confirmModal, setConfirmModal] = useState({ open: false, type: '', title: '', message: '', action: null });
+    // 👇 Info Modal State
+    const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
     const handleUpdateGoal = async (val) => {
         setMonthlyGoal(val);
@@ -32,6 +34,7 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
         const userId = user.uid;
         const batch = writeBatch(db);
 
+        // ... (Veri setleri aynı)
         INITIAL_TRANSACTIONS.forEach(t => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'transactions')), t));
         INITIAL_PRODUCTS.forEach(p => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'products')), p));
         INITIAL_DEBTS.forEach(d => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'debts')), d));
@@ -49,7 +52,16 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
         batch.set(doc(db, 'artifacts', appId, 'users', userId, 'settings', 'fixedCosts'), { rent: 0, staff: 0, bills: 0, other: 0 });
         batch.set(doc(db, 'artifacts', appId, 'users', userId, 'settings', 'monthlyGoal'), { value: 120000 });
 
-        try { await batch.commit(); alert("✅ Örnek veriler ve Masalar başarıyla yüklendi!"); } catch (e) { alert("Hata: " + e.message); } finally { setDbLoading(false); setConfirmModal({ ...confirmModal, open: false }); }
+        try { 
+            await batch.commit(); 
+            // 👇 Alert yerine InfoModal
+            setInfoModal({ isOpen: true, type: 'success', title: 'İşlem Başarılı', message: 'Örnek veriler ve masalar başarıyla yüklendi.' });
+        } catch (e) { 
+            setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: e.message });
+        } finally { 
+            setDbLoading(false); 
+            setConfirmModal({ ...confirmModal, open: false }); 
+        }
     };
 
     const handleHardReset = async () => {
@@ -64,12 +76,14 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
                 snapshot.docs.forEach((doc) => batch.delete(doc.ref));
                 await batch.commit();
             }
-            alert("Tüm veriler temizlendi.");
-        } catch (e) { console.error(e); } 
+            // 👇 Alert yerine InfoModal
+            setInfoModal({ isOpen: true, type: 'success', title: 'Temizlendi', message: 'Tüm veriler başarıyla silindi ve sistem sıfırlandı.' });
+        } catch (e) { 
+            setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: e.message });
+        } 
         finally { setDbLoading(false); setConfirmModal({ ...confirmModal, open: false }); }
     };
 
-    // Buton tıklamaları artık modalı açıyor
     const openSeedModal = () => setConfirmModal({
         open: true, type: 'warning', title: 'Örnek Veri Yükle',
         message: 'Mevcut verilerin üzerine örnek veriler (MASALAR DAHİL) eklenecek. Devam edilsin mi?',
@@ -85,7 +99,6 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
              
-             {/* 👇 ONAY MODALI */}
              <ConfirmationModal 
                 isOpen={confirmModal.open}
                 onClose={() => setConfirmModal({ ...confirmModal, open: false })}
@@ -94,6 +107,15 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
                 message={confirmModal.message}
                 type={confirmModal.type}
                 loading={dbLoading}
+             />
+             
+             {/* 👇 INFO MODAL EKLENDİ */}
+             <InfoModal
+                isOpen={infoModal.isOpen}
+                onClose={() => setInfoModal({ ...infoModal, isOpen: false })}
+                type={infoModal.type}
+                title={infoModal.title}
+                message={infoModal.message}
              />
 
              <div className="flex justify-between items-center">
@@ -128,7 +150,6 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
              <div className="border border-red-500/20 bg-red-900/5 p-6 rounded-2xl">
                 <h3 className="font-bold text-red-400 mb-2 flex items-center gap-2"><Database size={18}/> Veri Yönetimi</h3>
                 <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                    {/* 👇 Butonlar open...Modal fonksiyonlarını çağırıyor */}
                     <button onClick={openSeedModal} disabled={dbLoading} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-slate-600">{dbLoading ? <Loader2 className="animate-spin"/> : <Database size={16}/>} Örnek Veri & Masaları Yükle</button>
                     <button onClick={openResetModal} disabled={dbLoading} className="flex-1 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-500 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-red-500/50">{dbLoading ? <Loader2 className="animate-spin"/> : <Trash2 size={16}/>} Tümünü Sil</button>
                 </div>

@@ -1,19 +1,23 @@
-// pages/Inventory.jsx (MODAL EKLENMİŞ HALİ)
+// pages/Inventory.jsx (PROFESYONEL POPUP'LAR EKLENMİŞ SON HALİ)
 
 import React, { useState, useMemo } from 'react';
 import { Truck, PlusCircle, AlertTriangle, Trash2, Box, RefreshCw, Loader2, ChefHat, Edit, X, Database } from 'lucide-react'; 
 import { addDoc, doc, collection, writeBatch, updateDoc, deleteDoc } from 'firebase/firestore'; 
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
-import ConfirmationModal from '../components/ConfirmationModal'; // 👇 MODAL IMPORT
+import ConfirmationModal from '../components/ConfirmationModal';
+import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
 
 const Inventory = ({ ingredients, debts }) => {
     const [newPurchase, setNewPurchase] = useState({ supplier: '', amount: '', quantity: '', ingredientId: '', isDebt: false });
     const [processing, setProcessing] = useState(false);
     const [newIngredient, setNewIngredient] = useState({ name: '', unit: 'kg', price: '', stock: '' });
     
-    // 👇 Silme Onayı State'i
+    // Modal State'leri
     const [deleteData, setDeleteData] = useState(null); // { id, name }
+    
+    // 👇 Info Modal State'i
+    const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
     // --- STOK VE TEDARİKÇİ HESAPLAMALARI ---
     const stockStats = useMemo(() => {
@@ -33,6 +37,7 @@ const Inventory = ({ ingredients, debts }) => {
                 name: newIngredient.name, unit: newIngredient.unit, price: Number(newIngredient.price) || 0, stock: Number(newIngredient.stock) || 0, order: ingredients.length + 1
             });
             setNewIngredient({ name: '', unit: 'kg', price: '', stock: '' });
+            // İsteğe bağlı: Başarılı ekleme mesajı da gösterilebilir
         } catch (error) { console.error(error); }
     };
 
@@ -43,18 +48,26 @@ const Inventory = ({ ingredients, debts }) => {
         try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', id), { [field]: val }); } catch (error) { console.error(error); }
     };
     
-    // 👇 Modal Onaylı Silme Fonksiyonu
+    // Modal Onaylı Silme Fonksiyonu
     const confirmDelete = async () => {
         if (!deleteData) return;
         const user = auth.currentUser;
         try {
             await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', deleteData.id));
             setDeleteData(null);
-        } catch (error) { console.error(error); alert("Hata oluştu."); }
+        } catch (error) { 
+            console.error(error); 
+            setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'Silme işlemi sırasında bir sorun oluştu.' });
+        }
     };
 
+    // 👇 GÜNCELLENEN ALIM KAYDETME FONKSİYONU
     const handleRecordPurchase = async () => {
-        if (!newPurchase.ingredientId || !newPurchase.amount || !newPurchase.quantity || !newPurchase.supplier) return;
+        if (!newPurchase.ingredientId || !newPurchase.amount || !newPurchase.quantity || !newPurchase.supplier) {
+            setInfoModal({ isOpen: true, type: 'warning', title: 'Eksik Bilgi', message: 'Lütfen tüm alanları doldurunuz.' });
+            return;
+        }
+
         const user = auth.currentUser;
         setProcessing(true);
         const ingredient = ingredients.find(i => i.id === newPurchase.ingredientId);
@@ -65,6 +78,9 @@ const Inventory = ({ ingredients, debts }) => {
         try {
             const ingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', newPurchase.ingredientId);
             const newStock = (ingredient.stock || 0) + purchaseQuantity;
+            
+            // Ortalama maliyet hesabı yerine son alım fiyatını güncelleyebiliriz veya ortalama alabiliriz.
+            // Burada basitlik adına yeni birim fiyatı güncelliyoruz.
             const newPrice = purchaseAmount / purchaseQuantity; 
             batch.update(ingRef, { stock: newStock, price: newPrice });
 
@@ -81,20 +97,41 @@ const Inventory = ({ ingredients, debts }) => {
             }
             await batch.commit();
             setNewPurchase({ supplier: '', amount: '', quantity: '', ingredientId: '', isDebt: false });
-            alert("✅ Alım kaydedildi.");
-        } catch (error) { console.error(error); } finally { setProcessing(false); }
+            
+            // 👇 Başarılı işlem modalı
+            setInfoModal({ 
+                isOpen: true, 
+                type: 'success', 
+                title: 'Alım Kaydedildi', 
+                message: `${purchaseQuantity} ${ingredient.unit} ${ingredient.name} stoğa eklendi ve ${newPurchase.isDebt ? 'borç' : 'gider'} kaydı oluşturuldu.` 
+            });
+
+        } catch (error) { 
+            console.error(error);
+            setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'İşlem kaydedilirken bir sorun oluştu.' });
+        } finally { 
+            setProcessing(false); 
+        }
     };
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
              
-             {/* 👇 ONAY MODALI */}
+             {/* 👇 MODALLAR */}
              <ConfirmationModal 
                 isOpen={!!deleteData} 
                 onClose={() => setDeleteData(null)} 
                 onConfirm={confirmDelete}
                 title="Hammaddeyi Sil" 
                 message={`"${deleteData?.name}" adlı hammaddeyi silmek istediğinize emin misiniz?`}
+             />
+
+             <InfoModal 
+                isOpen={infoModal.isOpen} 
+                onClose={() => setInfoModal({ ...infoModal, isOpen: false })} 
+                type={infoModal.type} 
+                title={infoModal.title} 
+                message={infoModal.message} 
              />
 
              <div className="flex justify-between items-center mb-6">
@@ -157,7 +194,6 @@ const Inventory = ({ ingredients, debts }) => {
                                             <td className="px-4 py-3 text-orange-400 w-32"><div className="flex items-center gap-1"><input type="number" value={ing.price} onChange={(e) => handleUpdateIngredient(ing.id, 'price', e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-orange-400 font-bold w-20 text-right outline-none focus:border-orange-500 text-xs"/><span className='text-xs text-slate-500'>₺ / {ing.unit}</span></div></td>
                                             <td className={`px-4 py-3 font-mono w-32 ${ing.stock < 5 ? 'text-red-400 font-bold' : 'text-slate-300'}`}><div className="flex items-center gap-1"><input type="number" value={ing.stock} onChange={(e) => handleUpdateIngredient(ing.id, 'stock', e.target.value)} className={`bg-slate-900 border border-slate-600 rounded px-2 py-1 ${ing.stock < 5 ? 'text-red-400' : 'text-slate-300'} font-bold w-16 text-right outline-none focus:border-indigo-500 text-xs`}/><span className='text-xs text-slate-500'>{ing.unit}</span></div></td>
                                             <td className="px-4 py-3 text-right font-bold text-emerald-400">{formatCurrency(ing.price * (ing.stock || 0))} ₺</td>
-                                            {/* 👇 Buton artık setDeleteData kullanıyor */}
                                             <td className="px-4 py-3 text-right w-16"><button onClick={() => setDeleteData(ing)} className="text-slate-500 hover:text-red-500 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity" title="Hammaddeyi Sil"><Trash2 size={16}/></button></td>
                                         </tr>
                                     ))}

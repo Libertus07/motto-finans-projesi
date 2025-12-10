@@ -124,7 +124,7 @@ export default function PatronFinancePro() {
           return <Inventory ingredients={ingredients} debts={debts} />;
 
       case 'recipe':
-          return <Recipe ingredients={ingredients} />;
+          return <Recipe ingredients={ingredients} products={products} />;
           
       case 'investments':
           return <Investments investments={investments} marketRates={marketRates} />;

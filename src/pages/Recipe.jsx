@@ -1,32 +1,60 @@
-// pages/Recipe.jsx (GÜNCELLENMİŞ)
+// pages/Recipe.jsx (INFO MODAL EKLENMİŞ VE STOK ENTEGRASYONLU SON HALİ)
 
-import React, { useState } from 'react';
-import { ChefHat, Package, Settings, Move, PlusCircle, AlertTriangle, Scale, X, Loader2, Wand2, Sparkles, Trash2 } from 'lucide-react';
-import { addDoc, deleteDoc, updateDoc, doc, collection } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { ChefHat, Package, Settings, Move, PlusCircle, AlertTriangle, Scale, X, Loader2, Wand2, Sparkles, Trash2, Save, CheckCircle2 } from 'lucide-react';
+import { addDoc, deleteDoc, updateDoc, setDoc, doc, collection, getDoc } from 'firebase/firestore'; 
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
-import ConfirmationModal from '../components/ConfirmationModal'; // 👇 MODAL IMPORT
+import ConfirmationModal from '../components/ConfirmationModal';
+import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
 
-const Recipe = ({ ingredients }) => {
+const Recipe = ({ ingredients, products }) => { 
     const [isEditingIngredients, setIsEditingIngredients] = useState(false);
     const [newIngredient, setNewIngredient] = useState({ name: '', unit: 'kg', price: '', stock: '' });
-    const [recipeBuilder, setRecipeBuilder] = useState({ productName: '', yieldAmount: 1, items: [] });
+    
+    // Recipe Builder State
+    const [selectedProductId, setSelectedProductId] = useState(''); 
+    const [recipeBuilder, setRecipeBuilder] = useState({ yieldAmount: 1, items: [] });
+    
     const [aiLoading, setAiLoading] = useState(false);
     const [aiRecipeAdvice, setAiRecipeAdvice] = useState("");
     
-    // 👇 Silme onayı için state
+    // Modal State'leri
     const [deleteId, setDeleteId] = useState(null);
+    const [saving, setSaving] = useState(false);
+    
+    // 👇 Info Modal State'i
+    const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+
+    // Seçilen ürün değiştiğinde reçeteyi getir
+    useEffect(() => {
+        const fetchRecipe = async () => {
+            if (!selectedProductId) {
+                setRecipeBuilder({ yieldAmount: 1, items: [] });
+                return;
+            }
+            
+            const user = auth.currentUser;
+            if(!user) return;
+
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'recipes', selectedProductId);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                setRecipeBuilder(docSnap.data());
+            } else {
+                setRecipeBuilder({ yieldAmount: 1, items: [] });
+            }
+        };
+        fetchRecipe();
+    }, [selectedProductId]);
 
     // --- HAMMADDE YÖNETİMİ ---
     const handleAddIngredient = async () => {
         if (!newIngredient.name || !newIngredient.price) return;
         const user = auth.currentUser;
         const ingData = {
-            name: newIngredient.name,
-            unit: newIngredient.unit,
-            price: Number(newIngredient.price) || 0,
-            stock: Number(newIngredient.stock) || 0,
-            order: ingredients.length + 1
+            name: newIngredient.name, unit: newIngredient.unit, price: Number(newIngredient.price) || 0, stock: Number(newIngredient.stock) || 0, order: ingredients.length + 1
         };
         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'ingredients'), ingData);
         setNewIngredient({ name: '', unit: 'kg', price: '', stock: '' });
@@ -38,7 +66,6 @@ const Recipe = ({ ingredients }) => {
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', id), { [field]: val });
     };
 
-    // 👇 Modal onayından sonra çalışacak silme fonksiyonu
     const confirmDelete = async () => {
         if (!deleteId) return;
         const user = auth.currentUser;
@@ -66,6 +93,31 @@ const Recipe = ({ ingredients }) => {
         setRecipeBuilder(prev => ({ ...prev, items: prev.items.filter(item => item.id !== id) }));
     };
 
+    // 👇 GÜNCELLENEN KAYDETME FONKSİYONU (InfoModal kullanıyor)
+    const handleSaveRecipe = async () => {
+        if (!selectedProductId) {
+            setInfoModal({ isOpen: true, type: 'warning', title: 'Ürün Seçilmedi', message: 'Lütfen reçeteyi kaydetmek için önce bir ürün seçin.' });
+            return;
+        }
+        
+        const user = auth.currentUser;
+        setSaving(true);
+        try {
+            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'recipes', selectedProductId), recipeBuilder);
+            setInfoModal({ 
+                isOpen: true, 
+                type: 'success', 
+                title: 'Reçete Kaydedildi', 
+                message: 'Reçete başarıyla sisteme işlendi. Artık bu ürün satıldığında stoktan otomatik düşecek.' 
+            });
+        } catch (error) {
+            console.error(error);
+            setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'Reçete kaydedilirken bir sorun oluştu.' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const calculateRecipeCost = () => {
         const totalCost = recipeBuilder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         return { totalCost, unitCost: totalCost / (recipeBuilder.yieldAmount || 1) };
@@ -74,7 +126,10 @@ const Recipe = ({ ingredients }) => {
     const recipeCost = calculateRecipeCost();
 
     const generateRecipeAdvice = async () => {
-        if(recipeBuilder.items.length === 0) return setAiRecipeAdvice("Lütfen önce malzeme ekleyin.");
+        if(recipeBuilder.items.length === 0) {
+            setInfoModal({ isOpen: true, type: 'warning', title: 'Malzeme Eksik', message: 'Yapay zeka analizi için lütfen önce reçeteye malzeme ekleyin.' });
+            return;
+        }
         setAiLoading(true);
         setTimeout(() => {
             let advice = `Birim maliyetiniz: ${formatCurrency(recipeCost.unitCost)} ₺. `;
@@ -87,13 +142,22 @@ const Recipe = ({ ingredients }) => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-             {/* 👇 Onay Modalı */}
+             
+             {/* 👇 MODALLAR */}
              <ConfirmationModal 
                 isOpen={!!deleteId} 
                 onClose={() => setDeleteId(null)} 
-                onConfirm={confirmDelete}
+                onConfirm={confirmDelete} 
                 title="Malzeme Silinsin mi?" 
-                message="Bu malzemeyi silmek istediğinize emin misiniz? Reçeteler etkilenebilir."
+                message="Bu malzemeyi silmek istediğinize emin misiniz? Reçeteler etkilenebilir." 
+             />
+             
+             <InfoModal 
+                isOpen={infoModal.isOpen} 
+                onClose={() => setInfoModal({ ...infoModal, isOpen: false })} 
+                type={infoModal.type} 
+                title={infoModal.title} 
+                message={infoModal.message} 
              />
 
              <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-white flex items-center gap-2"><ChefHat className="text-orange-500"/> Reçete & Maliyet</h2></div>
@@ -126,7 +190,6 @@ const Recipe = ({ ingredients }) => {
                                         <Move size={14} className="text-slate-500"/>
                                         <input type="text" value={ing.name} onChange={(e) => handleUpdateIngredient(ing.id, 'name', e.target.value)} className="bg-transparent border-b border-slate-600 text-xs text-white w-full outline-none"/>
                                         <input type="number" value={ing.price} onChange={(e) => handleUpdateIngredient(ing.id, 'price', e.target.value)} className="bg-transparent border-b border-slate-600 text-xs text-orange-400 w-12 text-center outline-none"/>
-                                        {/* 👇 Silme butonu state güncelliyor */}
                                         <button onClick={(e) => {e.stopPropagation(); setDeleteId(ing.id)}} className="text-slate-600 hover:text-red-500"><Trash2 size={14}/></button>
                                     </div>
                                 ) : (
@@ -149,24 +212,32 @@ const Recipe = ({ ingredients }) => {
                     </div>
                 </div>
 
-                {/* SAĞ: HESAPLAYICI (Aynı kaldı) */}
+                {/* SAĞ: HESAPLAYICI VE KAYIT */}
                 <div className="lg:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                    <h3 className="font-bold text-slate-300 mb-4 flex items-center gap-2"><Scale size={18}/> Hesaplayıcı</h3>
+                    <h3 className="font-bold text-slate-300 mb-4 flex items-center gap-2"><Scale size={18}/> Reçete Tanımla</h3>
                     <div className="space-y-4">
                         <div className="flex gap-4">
-                            <input type="text" placeholder="Ürün Adı" value={recipeBuilder.productName} onChange={(e) => setRecipeBuilder({...recipeBuilder, productName: e.target.value})} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"/>
-                            <input type="number" placeholder="Çıktı (Adet)" value={recipeBuilder.yieldAmount} onChange={(e) => setRecipeBuilder({...recipeBuilder, yieldAmount: Number(e.target.value)})} className="w-24 bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"/>
+                            <select value={selectedProductId} onChange={(e) => setSelectedProductId(e.target.value)} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none">
+                                <option value="">Ürün Seçiniz...</option>
+                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            
+                            <div className="flex items-center gap-2 bg-slate-900 px-3 rounded-lg border border-slate-700">
+                                <span className="text-xs text-slate-500">Çıktı:</span>
+                                <input type="number" value={recipeBuilder.yieldAmount} onChange={(e) => setRecipeBuilder({...recipeBuilder, yieldAmount: Number(e.target.value)})} className="w-12 bg-transparent text-white font-bold text-center outline-none"/>
+                                <span className="text-xs text-slate-500">Adet</span>
+                            </div>
                         </div>
                         
-                        <div className="space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800 min-h-[100px]">
-                            {recipeBuilder.items.length === 0 ? <p className="text-slate-500 text-sm text-center py-4">Soldaki listeden malzeme seçin.</p> : recipeBuilder.items.map(item => (
+                        <div className="space-y-2 bg-slate-900/50 p-4 rounded-xl border border-slate-800 min-h-[150px]">
+                            {recipeBuilder.items.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-slate-500 text-sm py-8"><Package size={32} className="mb-2 opacity-50"/><p>Soldan malzeme seçerek reçete oluşturun.</p></div> : recipeBuilder.items.map(item => (
                                 <div key={item.id} className="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700">
                                     <span className="text-sm text-slate-300">{item.name}</span>
                                     <div className="flex items-center gap-2">
-                                        <input type="number" value={item.quantity} onChange={(e) => updateRecipeItemQuantity(item.id, e.target.value)} className="w-16 bg-slate-800 border-slate-600 rounded p-1 text-white text-sm"/>
-                                        <span className="text-xs text-slate-500">{item.unit}</span>
+                                        <input type="number" value={item.quantity} onChange={(e) => updateRecipeItemQuantity(item.id, e.target.value)} className="w-20 bg-slate-800 border border-slate-600 rounded p-1 text-white text-sm text-center"/>
+                                        <span className="text-xs text-slate-500 w-10">{item.unit}</span>
                                     </div>
-                                    <span className="text-xs text-yellow-400 font-bold">{formatCurrency(item.price * item.quantity)} ₺</span>
+                                    <span className="text-xs text-yellow-400 font-bold w-16 text-right">{formatCurrency(item.price * item.quantity)} ₺</span>
                                     <button onClick={() => removeRecipeItem(item.id)} className="text-slate-600 hover:text-red-500"><X size={14}/></button>
                                 </div>
                             ))}
@@ -177,9 +248,15 @@ const Recipe = ({ ingredients }) => {
                             <span className="text-emerald-400">{formatCurrency(recipeCost.unitCost)} ₺</span>
                         </div>
                         
-                        <button onClick={generateRecipeAdvice} disabled={aiLoading} className="w-full py-3 rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2">
-                            {aiLoading ? <Loader2 className="animate-spin"/> : <Wand2/>} AI ANALİZİ
-                        </button>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button onClick={generateRecipeAdvice} disabled={aiLoading} className="py-3 rounded-xl font-bold bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 flex items-center justify-center gap-2">
+                                {aiLoading ? <Loader2 className="animate-spin" size={18}/> : <Wand2 size={18}/>} AI Analizi
+                            </button>
+                            {/* 👇 KAYDET BUTONU */}
+                            <button onClick={handleSaveRecipe} disabled={saving} className="py-3 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 disabled:opacity-50">
+                                {saving ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} REÇETEYİ KAYDET
+                            </button>
+                        </div>
                         {aiRecipeAdvice && <div className="bg-purple-900/20 p-3 rounded-lg text-purple-200 text-sm flex gap-2"><Sparkles size={16} className="shrink-0 mt-1"/>{aiRecipeAdvice}</div>}
                     </div>
                 </div>

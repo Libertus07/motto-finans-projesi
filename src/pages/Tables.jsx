@@ -7,6 +7,7 @@ import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import { THEME } from '../utils/constants';
 import Receipt from '../components/Receipt';
+import { deductStockForTransaction } from '../utils/stockManager';
 
 // 👇 Gerekli Modallar Import Edildi
 import TableTransferModal from '../components/TableTransferModal';
@@ -136,6 +137,10 @@ const Tables = ({ tables, products }) => {
                 category: 'Masa Satışı',
                 subMethod: subMethodDisplay 
             });
+
+            // 👇 YENİ EKLENEN SATIR: Stoktan Düş
+            await deductStockForTransaction(selectedTable.orders);
+            // 👆 Masa siparişlerini stoktan düşüyoruz
 
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'tables', selectedTable.id), { orders: [], total: 0, status: 'needs_cleaning' });
             
