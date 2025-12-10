@@ -1,8 +1,8 @@
-// App.jsx (3 ROLLÜ YETKİLENDİRME VE YÖNLENDİRME DÜZELTİLDİ)
+// App.jsx (BAKIM MODU EKLENMİŞ VERSİYON)
 
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { Loader2, Menu, Coffee } from 'lucide-react';
+import { Loader2, Menu, Coffee, Construction } from 'lucide-react'; // Construction ikonu eklendi
 
 import { auth } from './services/firebase';
 import { THEME } from './utils/constants';
@@ -10,6 +10,9 @@ import { THEME } from './utils/constants';
 import Sidebar from './components/Sidebar';
 import AuthScreen from './components/AuthScreen';
 import useFinanceData from './hooks/useFinanceData';
+
+// 👇 BAKIM MODU AYARI (Açmak için true, kapatmak için false yapın)
+const MAINTENANCE_MODE = true;
 
 // Sayfalar dinamik yukleniyor (Lazy Loading)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -45,10 +48,10 @@ export default function PatronFinancePro() {
   useEffect(() => {
     if (userRole === null) { setLoading(false); return; }
     
-    // 👇 YÖNLENDİRME MANTIĞI GÜNCELLENDİ
+    // Yönlendirme Mantığı
     if (userRole === 'kasiyer') setActiveTab('pos');
-    else if (userRole === 'garson') setActiveTab('tables'); // Garson direkt masalara
-    else setActiveTab('dashboard'); // Patron dashboard'a
+    else if (userRole === 'garson') setActiveTab('tables'); 
+    else setActiveTab('dashboard'); 
 
     const initAuth = async () => { 
         try { await signInAnonymously(auth); } 
@@ -67,13 +70,36 @@ export default function PatronFinancePro() {
     });
   }, [userRole]);
   
+  // 👇 BAKIM MODU EKRANI
+  if (MAINTENANCE_MODE) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
+        <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl max-w-md w-full animate-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Construction size={40} className="text-amber-500 animate-pulse" />
+          </div>
+          <h1 className="text-3xl font-black text-white mb-2">Sistem Bakımda</h1>
+          <p className="text-slate-400 mb-6">
+            Motto Coffee sistemi şu anda güncelleniyor. Daha iyi bir deneyim için kısa bir mola verdik.
+          </p>
+          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p className="text-xs text-slate-500 font-mono">Status: System Upgrade in Progress...</p>
+            <div className="w-full bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
+              <div className="bg-amber-500 h-full w-2/3 animate-[shimmer_2s_infinite]"></div>
+            </div>
+          </div>
+          <p className="text-xs text-slate-600 mt-6">Lütfen daha sonra tekrar deneyiniz.</p>
+        </div>
+      </div>
+    );
+  }
+
   const renderContent = () => {
-    // 👇 YETKİ KONTROLÜ (Kasiyer ve Garson)
+    // Yetki Kontrolü
     if (userRole === 'kasiyer' || userRole === 'garson') {
-        // İzin verilen sekmeler listesi
         const allowedTabs = userRole === 'garson' 
-            ? ['tables', 'products'] // Garson sadece Masa ve Menü
-            : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; // Kasiyer
+            ? ['tables', 'products'] 
+            : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; 
         
         if (!allowedTabs.includes(activeTab)) {
              return (
@@ -97,7 +123,6 @@ export default function PatronFinancePro() {
         return <CashierPOS products={products} ingredients={ingredients} />; 
 
       case 'tables':
-        // 👇 userRole prop'u eklendi (Garsonun ödeme alamaması için)
         return <Tables tables={tables} products={products} ingredients={ingredients} userRole={userRole} />;
 
       case 'transactions':
@@ -107,7 +132,6 @@ export default function PatronFinancePro() {
         return <Debts debts={debts} stats={stats} />;
 
       case 'products':
-          // 👇 userRole prop'u eklendi
           return <Products products={products} isPatron={userRole === 'patron'} userRole={userRole} />;
 
       case 'inventory': 
@@ -144,7 +168,6 @@ export default function PatronFinancePro() {
       <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-800 rounded-lg text-white shadow-lg border border-slate-700"><Menu size={24} /></button>
       <div className={`fixed inset-0 bg-black/50 z-40 md:hidden ${isMobileMenuOpen ? 'block' : 'hidden'}`} onClick={() => setIsMobileMenuOpen(false)}></div>
       
-      {/* 👇 userRole prop'u eklendi */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isMobile={!isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} userRole={userRole} />
 
       <main className={`flex-1 h-screen overflow-y-auto w-full relative ${isMobileMenuOpen ? 'overflow-hidden' : ''}`}>

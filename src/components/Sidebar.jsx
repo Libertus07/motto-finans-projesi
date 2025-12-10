@@ -1,4 +1,4 @@
-// components/Sidebar.jsx (GARSON RENGİ VE YETKİSİ EKLENMİŞ HALİ)
+// components/Sidebar.jsx (EKSİKLER TAMAMLANDI - SON HALİ)
 
 import React from 'react';
 import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid, Package } from 'lucide-react';
@@ -23,18 +23,22 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
     // 5. ÜRÜN VE STOK (Garson Menüyü Görebilir)
     { id: 'products', label: 'Menü & Ürün', icon: Coffee, roles: ['patron', 'kasiyer', 'garson'] },
     
-    // 6. YÖNETİMSEL
+    // 6. YÖNETİMSEL (SADECE PATRON)
     { id: 'inventory', label: 'Stok & Tedarikçi', icon: Package, roles: ['patron'] },
-    { id: 'recipe', label: 'Maliyet', icon: ChefHat, roles: ['patron'] },
+    
+    // 👇 GERİ GETİRİLEN MADDELER 👇
+    { id: 'recipe', label: 'Maliyet & Reçete', icon: ChefHat, roles: ['patron'] }, // Maliyet geri geldi
     { id: 'investments', label: 'Yatırımlar', icon: Coins, roles: ['patron'] },
     { id: 'stats', label: 'Raporlar', icon: BarChart3, roles: ['patron'] },
-    { id: 'assistant', label: 'Asistan (AI)', icon: MessageSquare, roles: ['patron'] },
+    { id: 'assistant', label: 'Asistan (AI)', icon: MessageSquare, roles: ['patron'] }, // AI geri geldi
+    // 👆 ----------------------- 👆
+
     { id: 'settings', label: 'Ayarlar', icon: Settings, roles: ['patron', 'kasiyer'] },
   ];
 
   const visibleItems = menuItems.filter(item => item.roles.includes(userRole));
 
-  // 👇 Rol Rengi ve Yazısını Belirleyen Yardımcı Fonksiyon
+  // Rol Rengi ve Yazısını Belirleyen Yardımcı Fonksiyon
   const getRoleUI = () => {
       if (userRole === 'patron') return { color: 'bg-indigo-700', label: 'Patron', desc: 'Tam Yetki' };
       if (userRole === 'kasiyer') return { color: 'bg-emerald-700', label: 'Kasiyer', desc: 'Satış & Kasa' };
@@ -68,7 +72,6 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
         ))}
       </div>
 
-      {/* 👇 GÜNCELLENMİŞ PROFİL KISMI */}
       <div className="p-4 border-t border-slate-800">
         <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 flex items-center gap-3">
           <div className={`p-2 rounded-full ${roleUI.color}`}>

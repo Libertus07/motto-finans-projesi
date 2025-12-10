@@ -1,4 +1,4 @@
-// pages/Tables.jsx (GARSON YETKİ KISITLAMASI VE MOBİL UYUM EKLENMİŞ HALİ)
+// pages/Tables.jsx (PROFESYONEL SEÇENEKLİ VERSİYON)
 
 import React, { useState, useEffect } from 'react';
 import { Table as TableIcon, Coffee, Trash2, Printer, CheckCircle2, CreditCard, Banknote, X, Sun, Cloud, Home, ArrowUp, Move, AlertTriangle } from 'lucide-react';
@@ -10,8 +10,9 @@ import Receipt from '../components/Receipt';
 import TableTransferModal from '../components/TableTransferModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TableCloseModal from '../components/TableCloseModal';
+import ProductOptionsModal from '../components/ProductOptionsModal'; // 👇 YENİ IMPORT
 
-const Tables = ({ tables, products, userRole }) => { // 👇 userRole eklendi
+const Tables = ({ tables, products, userRole }) => { 
     const [selectedTable, setSelectedTable] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState('Tümü');
     const [activeZone, setActiveZone] = useState('Tümü');
@@ -23,6 +24,9 @@ const Tables = ({ tables, products, userRole }) => { // 👇 userRole eklendi
     const [isEmptyConfirmOpen, setIsEmptyConfirmOpen] = useState(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
     
+    // 👇 ÜRÜN SEÇENEK STATE'LERİ
+    const [productToCustomize, setProductToCustomize] = useState(null); 
+
     // Ödeme state'leri
     const [paymentMethod, setPaymentMethod] = useState('cash'); 
     const [cardBank, setCardBank] = useState('ziraat');
@@ -67,22 +71,51 @@ const Tables = ({ tables, products, userRole }) => { // 👇 userRole eklendi
         return <Home size={16}/>;
     };
 
-    // --- FIREBASE İŞLEMLERİ ---
-    const handleAddOrder = async (tableId, product) => {
+    // --- SİPARİŞ EKLEME SÜRECİ ---
+    
+    // 1. Ürüne tıklanınca Modalı Aç
+    const handleProductClick = (product) => {
+        setProductToCustomize(product);
+    };
+
+    // 2. Modal onaylayınca Veritabanına Yaz
+    const handleConfirmOrder = async (customizedProduct) => {
         const user = auth.currentUser;
-        if (!user || processing) return;
+        if (!user || processing || !selectedTable) return;
+        setProductToCustomize(null); // Modalı kapat
         setProcessing(true);
-        const tableRef = doc(db, 'artifacts', appId, 'users', user.uid, 'tables', tableId);
+
+        const tableRef = doc(db, 'artifacts', appId, 'users', user.uid, 'tables', selectedTable.id);
         try {
-            const currentTable = tables.find(t => t.id === tableId);
+            const currentTable = tables.find(t => t.id === selectedTable.id);
             if (!currentTable) return;
-            const existingOrderIndex = currentTable.orders.findIndex(o => o.id === product.id);
-            const newTotal = currentTable.total + product.price;
-            let newOrders = [...currentTable.orders];
-            if (existingOrderIndex !== -1) newOrders[existingOrderIndex].quantity += 1;
-            else newOrders.push({ ...product, quantity: 1 });
-            await updateDoc(tableRef, { orders: newOrders, total: newTotal, status: currentTable.status === 'empty' ? 'occupied' : currentTable.status });
-        } catch (error) { console.error(error); } finally { setProcessing(false); }
+
+            // Benzersiz bir ID oluştur (Çünkü aynı üründen farklı özelliklerde olabilir)
+            // Örn: Latte (Küçük) ve Latte (Büyük) ayrı satır olmalı
+            const orderId = customizedProduct.id + '-' + Date.now(); 
+            
+            const newOrder = {
+                id: orderId,
+                productId: customizedProduct.id, // Orijinal ID (Stok düşüşü için)
+                name: customizedProduct.name, // Modifiye edilmiş isim
+                price: customizedProduct.price, // Modifiye edilmiş fiyat
+                quantity: customizedProduct.quantity
+            };
+
+            const newTotal = currentTable.total + (newOrder.price * newOrder.quantity);
+            let newOrders = [...currentTable.orders, newOrder];
+            
+            await updateDoc(tableRef, { 
+                orders: newOrders, 
+                total: newTotal, 
+                status: currentTable.status === 'empty' ? 'occupied' : currentTable.status 
+            });
+
+        } catch (error) { 
+            console.error("Sipariş ekleme hatası:", error); 
+        } finally { 
+            setProcessing(false); 
+        }
     };
 
     const handleRemoveOrder = async (tableId, orderId, price) => {
@@ -93,12 +126,22 @@ const Tables = ({ tables, products, userRole }) => { // 👇 userRole eklendi
         try {
             const currentTable = tables.find(t => t.id === tableId);
             if (!currentTable) return;
+            
+            // ID'ye göre bul (Artık unique ID kullanıyoruz)
             const existingOrderIndex = currentTable.orders.findIndex(o => o.id === orderId);
             if (existingOrderIndex === -1) return;
+            
             let newOrders = [...currentTable.orders];
-            const newTotal = currentTable.total - price;
-            if (newOrders[existingOrderIndex].quantity > 1) newOrders[existingOrderIndex].quantity -= 1;
-            else newOrders.splice(existingOrderIndex, 1);
+            const newTotal = currentTable.total - price; // 1 adet fiyatını düş
+            
+            // Miktar kontrolü yok, direkt silsin mi? Yoksa miktar azaltsın mı?
+            // Basitlik için: Miktar 1'den büyükse azalt, yoksa sil.
+            if (newOrders[existingOrderIndex].quantity > 1) {
+                newOrders[existingOrderIndex].quantity -= 1;
+            } else {
+                newOrders.splice(existingOrderIndex, 1);
+            }
+
             const newStatus = newOrders.length === 0 ? 'empty' : currentTable.status;
             await updateDoc(tableRef, { orders: newOrders, total: newTotal, status: newStatus });
         } catch (error) { console.error(error); } finally { setProcessing(false); }
@@ -166,9 +209,18 @@ const Tables = ({ tables, products, userRole }) => { // 👇 userRole eklendi
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] overflow-hidden relative">
             
+            {/* MODALLAR */}
             <TableTransferModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} tables={tables} selectedTableId={selectedTable?.id} onConfirm={handleTransfer} loading={processing}/>
             <ConfirmationModal isOpen={isEmptyConfirmOpen} onClose={() => setIsEmptyConfirmOpen(false)} onConfirm={confirmMarkAsEmpty} title="Masayı Temizle" message="Bu masayı boş ve temiz olarak işaretlemek istediğinize emin misiniz? (Siparişler silinir)" type="warning" confirmText="TEMİZLE"/>
             <TableCloseModal isOpen={isCloseModalOpen} onClose={() => setIsCloseModalOpen(false)} onConfirm={confirmCloseTable} tableName={selectedTable?.name} amount={selectedTable?.total} method={paymentMethod} bank={cardBank} loading={processing}/>
+            
+            {/* 👇 YENİ ÜRÜN SEÇENEK MODALI */}
+            <ProductOptionsModal 
+                isOpen={!!productToCustomize} 
+                onClose={() => setProductToCustomize(null)} 
+                product={productToCustomize} 
+                onConfirm={handleConfirmOrder}
+            />
 
             {/* SOL KISIM: MASA LİSTESİ */}
             <div className={`flex-1 overflow-y-auto p-4 md:p-8 ${selectedTable ? 'hidden md:block' : 'block'}`}>
@@ -204,25 +256,34 @@ const Tables = ({ tables, products, userRole }) => { // 👇 userRole eklendi
                         <button onClick={() => setSelectedCategory('Tümü')} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-colors ${selectedCategory === 'Tümü' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Tümü</button>
                         {categories.map(cat => ( <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-colors ${selectedCategory === cat ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{cat}</button> ))}
                     </div>
+                    
+                    {/* 👇 ÜRÜN SEÇİMİ (TIKLAYINCA MODAL AÇAR) */}
                     <div className="grid grid-cols-2 gap-3 p-4 border-b border-slate-800 overflow-y-auto shrink-0 max-h-52 custom-scrollbar">
                         {availableProducts.map(product => (
-                            <button key={product.id} onClick={() => handleAddOrder(selectedTable.id, product)} className="p-3 bg-slate-800 border border-slate-700 rounded-xl hover:bg-slate-700 transition-colors active:scale-[0.98] flex flex-col items-start">
+                            <button key={product.id} onClick={() => handleProductClick(product)} className="p-3 bg-slate-800 border border-slate-700 rounded-xl hover:bg-slate-700 transition-colors active:scale-[0.98] flex flex-col items-start">
                                 <span className="text-sm font-semibold text-white truncate w-full text-left">{product.name}</span>
                                 <span className="text-xs text-indigo-400 font-bold mt-1">{formatCurrency(product.price)} ₺</span>
                             </button>
                         ))}
                     </div>
+
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                         {selectedTable.orders.length > 0 ? ( selectedTable.orders.map(order => (
                                 <div key={order.id} className="flex justify-between items-center p-2 bg-slate-900/50 rounded-lg border border-slate-800">
-                                    <div className="flex-1"><span className="text-sm font-medium">{order.name}</span><span className="text-xs text-slate-500 block">x{order.quantity}</span></div>
-                                    <div className="flex items-center gap-2"><span className="font-bold text-sm text-indigo-400">{formatCurrency(order.price * order.quantity)} ₺</span><button onClick={() => handleRemoveOrder(selectedTable.id, order.id, order.price)} className="text-red-500 hover:text-red-400 p-1 rounded-full hover:bg-slate-800"><Trash2 size={16}/></button></div>
+                                    <div className="flex-1 min-w-0 pr-2">
+                                        <span className="text-sm font-medium block truncate">{order.name}</span>
+                                        <span className="text-xs text-slate-500 block">x{order.quantity}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="font-bold text-sm text-indigo-400">{formatCurrency(order.price * order.quantity)} ₺</span>
+                                        <button onClick={() => handleRemoveOrder(selectedTable.id, order.id, order.price)} className="text-red-500 hover:text-red-400 p-1 rounded-full hover:bg-slate-800"><Trash2 size={16}/></button>
+                                    </div>
                                 </div>
                             ))
                         ) : <div className="text-center py-10 text-slate-600"><Coffee size={32} className="mx-auto mb-2"/><p>Bu masada sipariş yok.</p></div>}
                     </div>
                     
-                    {/* 👇 ÖDEME KISMI (GARSON KONTROLÜ) */}
+                    {/* ÖDEME KISMI (GARSON KONTROLÜ) */}
                     <div className="p-5 bg-slate-900 border-t border-slate-800">
                         <div className="flex justify-between items-end mb-4"><span className="text-slate-400 text-sm mb-1 block">Toplam Tutar</span><span className="text-4xl font-extrabold text-white tracking-tight">{formatCurrency(selectedTable.total)} <span className="text-lg text-slate-500 font-normal">₺</span></span></div>
                         
