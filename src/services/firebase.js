@@ -1,8 +1,10 @@
-// services/firebase.js (GÜNCELLENMİŞ VE TEMİZLENMİŞ VERSİYON)
+// services/firebase.js (OFFLINE PWA DESTEĞİ + API DÜZELTMELERİ EKLENMİŞ SON HAL)
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+// 👇 enableIndexedDbPersistence eklendi
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage'; // Depolama için eklendi
 
 // Aşama 1'de çalışan (ve doğru olduğu kanıtlanan) yedek konfigürasyon.
 const FALLBACK_CONFIG_RAW = {
@@ -39,7 +41,6 @@ if (API_KEY_ENV && APP_ID_ENV) {
 }
 
 // 🔥 KRİTİK TEMİZLİK ADIMI: API Anahtarını tırnak, virgül ve boşluklardan temizle.
-// Bu, 400 Bad Request hatasını çözer.
 const cleanedApiKey = String(config.apiKey).replace(/["',]/g, '').trim();
 
 // Yeni konfigürasyon nesnesini oluştur
@@ -48,12 +49,30 @@ const finalConfig = {
     apiKey: cleanedApiKey // Temizlenmiş anahtarı kullan
 };
 
-
 // Bağlantıyı başlat
 const app = initializeApp(finalConfig);
 
-// Dışarıya aktar
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Servisleri başlat
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app); // Storage tanımlandı
 
+// 👇 ÇEVRİMDIŞI VERİ DESTEĞİNİ AKTİF ETME KODU (YENİ EKLENEN KISIM)
+try {
+  // Verileri tarayıcı hafızasına (IndexedDB) kaydeder
+  enableIndexedDbPersistence(db).catch((err) => {
+      if (err.code == 'failed-precondition') {
+          // Birden fazla sekme açıksa sadece birinde çalışır
+          console.log('Çoklu sekme hatası - Offline Persistence devre dışı');
+      } else if (err.code == 'unimplemented') {
+          console.log('Tarayıcı bu özelliği desteklemiyor');
+      }
+  });
+  console.log("✅ Offline mod (Persistence) aktif edildi.");
+} catch (e) {
+  console.log("Offline mode error:", e);
+}
+
+// Dışarıya aktar
+export { auth, db, storage };
 export const appId = finalConfig.appId;
