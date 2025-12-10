@@ -1,12 +1,21 @@
+// pages/Debts.jsx (MODAL ENTEGRE EDİLMİŞ HALİ)
+
 import React, { useState } from 'react';
-import { PlusCircle, Smartphone, Calendar, Trash2, CheckCircle2 } from 'lucide-react';
-import { addDoc, deleteDoc, doc, collection } from 'firebase/firestore';
+import { PlusCircle, Smartphone, Calendar, Trash2, CheckCircle2, DollarSign } from 'lucide-react';
+import { addDoc, deleteDoc, doc, collection, writeBatch } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import { THEME } from '../utils/constants';
 
+// 👇 YENİ IMPORT: Oluşturduğumuz Modalı ekliyoruz
+import PaymentModal from '../components/PaymentModal';
+
 const Debts = ({ debts, stats }) => {
     const [newDebt, setNewDebt] = useState({ supplier: '', amount: '', dueDate: '', note: '', contact: '' });
+    
+    // 👇 YENİ STATE: Modal yönetimi için
+    const [paymentModalData, setPaymentModalData] = useState(null); // { id, supplier, currentBalance } veya null
+    const [processing, setProcessing] = useState(false);
 
     // --- FIREBASE İŞLEMLERİ ---
     const handleAddDebt = async () => {
@@ -27,25 +36,71 @@ const Debts = ({ debts, stats }) => {
         setNewDebt({ supplier: '', contact: '', amount: '', dueDate: '', note: '' });
     };
 
-    const handleDeleteDebt = async (id) => {
-        if(!window.confirm("Bu kaydı silmek istiyor musunuz?")) return;
+    // 👇 1. ADIM: Modalı Açan Fonksiyon
+    const handleOpenPaymentModal = (debtId, supplierName, currentBalance) => {
+        setPaymentModalData({
+            id: debtId,
+            supplier: supplierName,
+            currentBalance: currentBalance
+        });
+    };
+
+    // 👇 2. ADIM: İşlemi Gerçekleştiren Fonksiyon (Modal'dan tetiklenir)
+    const handleProcessPayment = async (paymentAmount) => {
+        if (!paymentModalData) return;
+        setProcessing(true);
+
         const user = auth.currentUser;
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'debts', id));
+        const batch = writeBatch(db);
+        
+        // 1. Transaction (Gider) Kaydı: Ödeme kasadan çıksın
+        const transRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'));
+        batch.set(transRef, {
+            date: new Date().toISOString().split('T')[0],
+            type: 'expense',
+            amount: paymentAmount,
+            desc: `Borç Ödemesi: ${paymentModalData.supplier}`,
+            method: 'cash', 
+            category: 'Tedarikçi'
+        });
+
+        // 2. Debt Kaydı: Ödeme miktarını 'payment' türüyle ekle
+        batch.set(doc(collection(db, 'artifacts', appId, 'users', user.uid, 'debts')), {
+            supplier: paymentModalData.supplier,
+            amount: paymentAmount * -1, // Negatif kayıt
+            note: 'Borç Ödemesi',
+            type: 'payment',
+            createdAt: Date.now(),
+        });
+        
+        try {
+            await batch.commit();
+            setPaymentModalData(null); // Modalı kapat
+            alert(`✅ ${formatCurrency(paymentAmount)} ₺ ödeme başarıyla kaydedildi.`);
+        } catch (e) {
+            alert("Hata: Ödeme kaydedilemedi. " + e.message);
+        } finally {
+            setProcessing(false);
+        }
     };
 
     // Borçları düzenle (Ödenenleri düş)
     const currentDebts = debts.reduce((acc, d) => {
         if (!acc[d.supplier]) acc[d.supplier] = { amount: 0, latestDueDate: null, id: null, note: '', contact: '' };
+        
         if (d.type === 'debt') {
             acc[d.supplier].amount += Number(d.amount);
-            if (!acc[d.supplier].latestDueDate || d.dueDate > acc[d.supplier].latestDueDate) {
-                acc[d.supplier].latestDueDate = d.dueDate;
-                acc[d.supplier].note = d.note;
-                acc[d.supplier].id = d.id; // Son kaydın ID'si
-                if(d.contact) acc[d.supplier].contact = d.contact;
-            }
-        } 
-        // Ödeme mantığını basitleştirdik, direkt toplamdan düşüyoruz
+        } else if (d.type === 'payment') {
+            acc[d.supplier].amount += Number(d.amount); 
+        }
+        
+        if (d.dueDate && (!acc[d.supplier].latestDueDate || d.createdAt > acc[d.supplier].createdAt)) {
+            acc[d.supplier].latestDueDate = d.dueDate;
+            acc[d.supplier].note = d.note;
+            acc[d.supplier].id = d.id; 
+            if(d.contact) acc[d.supplier].contact = d.contact;
+        }
+
         return acc;
     }, {});
     
@@ -55,6 +110,16 @@ const Debts = ({ debts, stats }) => {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-right duration-500">
+             
+             {/* 👇 MODAL BİLEŞENİ BURAYA EKLENDİ */}
+             <PaymentModal
+                isOpen={!!paymentModalData}
+                onClose={() => setPaymentModalData(null)}
+                debtData={paymentModalData}
+                onConfirm={handleProcessPayment}
+                loading={processing}
+             />
+
              <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">Cari Hesap / Borç Takibi</h2>
                 <div className="bg-red-500/10 px-4 py-2 rounded-xl border border-red-500/20 text-right">
@@ -95,7 +160,14 @@ const Debts = ({ debts, stats }) => {
                                 <div className="text-xs text-slate-500 font-bold uppercase">Kalan Tutar</div>
                                 <div className="text-xl font-bold text-red-400">{formatCurrency(debt.amount)} ₺</div>
                              </div>
-                             <button onClick={() => handleDeleteDebt(debt.id)} className="p-2 bg-slate-800 text-slate-500 hover:text-red-500 rounded-lg transition-colors"><Trash2 size={20}/></button>
+                             {/* 👇 GÜNCELLENDİ: Ödeme Butonu artık modalı açıyor */}
+                             <button 
+                                onClick={() => handleOpenPaymentModal(debt.id, debt.supplier, debt.amount)} 
+                                className="p-2 bg-slate-800 text-slate-500 hover:text-emerald-500 rounded-lg transition-colors"
+                                title="Ödeme Kaydet"
+                             >
+                                 <CheckCircle2 size={20}/>
+                             </button>
                           </div>
                        </div>
                      ))

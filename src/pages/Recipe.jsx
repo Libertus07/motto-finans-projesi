@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChefHat, Package, Settings, Move, PlusCircle, AlertTriangle, Scale, X, Loader2, Wand2, Sparkles, Trash2 } from 'lucide-react';
-import { addDoc, deleteDoc, updateDoc, doc, collection } from 'firebase/firestore';
+import { addDoc, updateDoc, doc, collection, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 
