@@ -11,6 +11,7 @@ import Sidebar from './components/Sidebar';
 import AuthScreen from './components/AuthScreen';
 import useFinanceData from './hooks/useFinanceData';
 import InfoModal from './components/InfoModal';
+import MaintenancePage from './components/MaintenancePage';
 
 // 👇 BAKIM MODU AYARI
 const MAINTENANCE_MODE = false;
@@ -100,7 +101,7 @@ export default function PatronFinancePro() {
     }
   }, [staff, userRole]);
   
-  if (MAINTENANCE_MODE) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Sistem Bakımda</div>;
+  if (MAINTENANCE_MODE) return <MaintenancePage />;
 
   const renderContent = () => {
     if (userRole === 'kasiyer' || userRole === 'garson') {
