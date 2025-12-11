@@ -1,4 +1,4 @@
-// pages/Investments.jsx (GÜNCELLENMİŞ)
+// pages/Investments.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
 
 import React, { useState } from 'react';
 import { Coins, TrendingUp, PlusCircle, Trash2, PieChart as PieIcon } from 'lucide-react';
@@ -7,10 +7,11 @@ import { addDoc, deleteDoc, updateDoc, doc, collection, writeBatch } from 'fireb
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import { INITIAL_MARKET_RATES, COLORS } from '../utils/constants';
-
-// 👇 Modallar Import Edildi
 import LiquidationModal from '../components/LiquidationModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+
+// 👇 MAĞAZA ID
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const Investments = ({ investments, marketRates }) => {
     const getInitialPrice = (type) => marketRates?.[type] || '';
@@ -23,12 +24,10 @@ const Investments = ({ investments, marketRates }) => {
         currentPrice: getInitialPrice(Object.keys(INITIAL_MARKET_RATES)[0]) 
     });
 
-    // Modal State'leri
-    const [liquidationData, setLiquidationData] = useState(null); // { investment }
+    const [liquidationData, setLiquidationData] = useState(null); 
     const [deleteId, setDeleteId] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    // --- HESAPLAMALAR ---
     const investmentStats = investments.reduce((acc, inv) => {
         const currentPrice = inv.currentPrice || inv.buyPrice;
         const totalCost = inv.quantity * inv.buyPrice;
@@ -47,18 +46,21 @@ const Investments = ({ investments, marketRates }) => {
         return acc;
     }, []);
 
-    // --- İŞLEMLER ---
+    // --- İŞLEMLER (ORTAK HAVUZ) ---
     const handleAddInvestment = async () => {
         if (!newInvestment.quantity || !newInvestment.buyPrice) return;
-        const user = auth.currentUser;
         const invData = { ...newInvestment, quantity: Number(newInvestment.quantity), buyPrice: Number(newInvestment.buyPrice), currentPrice: Number(newInvestment.currentPrice) };
-        try { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'investments'), invData); } catch (e) { console.error(e); }
+        try { 
+            // 👇 ORTAK HAVUZA EKLEME
+            await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'investments'), invData); 
+        } catch (e) { console.error(e); }
     };
 
     const handleDeleteConfirm = async () => {
         if(!deleteId) return;
         setLoading(true);
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'investments', deleteId));
+        // 👇 ORTAK HAVUZDAN SİLME
+        await deleteDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'investments', deleteId));
         setLoading(false);
         setDeleteId(null);
     };
@@ -68,14 +70,15 @@ const Investments = ({ investments, marketRates }) => {
         setLoading(true);
         const inv = liquidationData;
         const totalIncome = sellQty * sellPrice;
-        const user = auth.currentUser;
         const batch = writeBatch(db);
 
-        const invRef = doc(db, 'artifacts', appId, 'users', user.uid, 'investments', inv.id);
+        // 1. YATIRIMI GÜNCELLE/SİL (ORTAK HAVUZ)
+        const invRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'investments', inv.id);
         if (sellQty === inv.quantity) batch.delete(invRef);
         else batch.update(invRef, { quantity: inv.quantity - sellQty });
 
-        const transRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'));
+        // 2. KASAYA PARA EKLE (ORTAK KASA)
+        const transRef = doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'));
         batch.set(transRef, {
             date: new Date().toISOString().split('T')[0],
             type: 'income',
@@ -93,30 +96,15 @@ const Investments = ({ investments, marketRates }) => {
     };
 
     const handleUpdateInvestment = async (id, field, value) => {
-        await updateDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'investments', id), { [field]: Number(value) });
+        // 👇 ORTAK HAVUZ GÜNCELLEME
+        await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'investments', id), { [field]: Number(value) });
     };
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-             
-             {/* MODALLAR */}
-             <ConfirmationModal 
-                isOpen={!!deleteId} 
-                onClose={() => setDeleteId(null)} 
-                onConfirm={handleDeleteConfirm}
-                title="Yatırımı Sil" 
-                message="Bu yatırımı portföyden silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
-                loading={loading}
-             />
-             <LiquidationModal
-                isOpen={!!liquidationData}
-                onClose={() => setLiquidationData(null)}
-                investment={liquidationData}
-                onConfirm={handleLiquidateConfirm}
-                loading={loading}
-             />
+             <ConfirmationModal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDeleteConfirm} title="Yatırımı Sil" message="Bu yatırımı portföyden silmek istediğinize emin misiniz? Bu işlem geri alınamaz." loading={loading}/>
+             <LiquidationModal isOpen={!!liquidationData} onClose={() => setLiquidationData(null)} investment={liquidationData} onConfirm={handleLiquidateConfirm} loading={loading}/>
 
-             {/* ÜST BİLGİ KARTLARI (Aynı kaldı) */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10"><Coins size={64} className="text-slate-400"/></div>
@@ -130,13 +118,10 @@ const Investments = ({ investments, marketRates }) => {
                 </div>
                 <div className={`p-6 rounded-2xl border relative overflow-hidden ${investmentStats.totalProfit >= 0 ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-red-900/20 border-red-500/30'}`}>
                     <div className="text-xs text-slate-400 font-bold uppercase mb-2">Toplam Kâr / Zarar</div>
-                    <div className={`text-3xl font-extrabold ${investmentStats.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {investmentStats.totalProfit >= 0 ? '+' : ''}{formatCurrency(investmentStats.totalProfit)} ₺
-                    </div>
+                    <div className={`text-3xl font-extrabold ${investmentStats.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{investmentStats.totalProfit >= 0 ? '+' : ''}{formatCurrency(investmentStats.totalProfit)} ₺</div>
                 </div>
              </div>
 
-             {/* ORTA BÖLÜM */}
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col items-center justify-center">
                     <h3 className="font-bold text-white mb-4 w-full text-left flex items-center gap-2"><PieIcon size={18} className="text-purple-400"/> Portföy Dağılımı</h3>
@@ -172,16 +157,11 @@ const Investments = ({ investments, marketRates }) => {
                 </div>
              </div>
 
-             {/* ALT BÖLÜM: YATIRIM LİSTESİ */}
              <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                 <h3 className="font-bold text-white mb-4">Varlıklarım</h3>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-slate-400">
-                        <thead className="text-xs text-slate-500 uppercase bg-slate-900/50">
-                            <tr>
-                                <th className="px-4 py-3 rounded-l-lg">Tarih</th><th className="px-4 py-3">Tür</th><th className="px-4 py-3">Adet</th><th className="px-4 py-3">Alış (Birim)</th><th className="px-4 py-3">Güncel Fiyat (Birim)</th><th className="px-4 py-3">Toplam Değer</th><th className="px-4 py-3">Kâr/Zarar</th><th className="px-4 py-3 text-right rounded-r-lg">İşlem</th>
-                            </tr>
-                        </thead>
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-900/50"><tr><th className="px-4 py-3 rounded-l-lg">Tarih</th><th className="px-4 py-3">Tür</th><th className="px-4 py-3">Adet</th><th className="px-4 py-3">Alış (Birim)</th><th className="px-4 py-3">Güncel Fiyat (Birim)</th><th className="px-4 py-3">Toplam Değer</th><th className="px-4 py-3">Kâr/Zarar</th><th className="px-4 py-3 text-right rounded-r-lg">İşlem</th></tr></thead>
                         <tbody className="divide-y divide-slate-700">{investments.map(inv => { 
                                 const currentPrice = inv.currentPrice; 
                                 const totalVal = inv.quantity * currentPrice; 

@@ -1,13 +1,14 @@
+// pages/ZReport.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
+
 import React, { useState, useMemo } from 'react';
-import { FileText, Printer, Coffee, DollarSign, CreditCard, Banknote, ChevronsRight, MinusCircle, PlusCircle } from 'lucide-react';
+import { FileText, Printer, Coffee, CreditCard, Banknote, MinusCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
-import Receipt from '../components/Receipt'; // Yazdırma için
+import Receipt from '../components/Receipt'; 
 
 const ZReport = ({ transactions }) => {
     const [printData, setPrintData] = useState(null);
     const today = new Date().toISOString().split('T')[0];
 
-    // --- RAPOR HESAPLAMALARI ---
     const report = useMemo(() => {
         const todaysTransactions = transactions.filter(t => t.date === today);
 
@@ -29,7 +30,6 @@ const ZReport = ({ transactions }) => {
         return summary;
     }, [transactions, today]);
 
-    // --- YAZDIRMA MANTIĞI ---
     const handlePrintZReport = () => {
         const reportItems = [
             { name: "TOPLAM CİRO", total: report.grossSales },
@@ -52,7 +52,6 @@ const ZReport = ({ transactions }) => {
         setTimeout(() => window.print(), 100);
     };
 
-    // İkon Renkleri
     const color = report.netCiro >= 0 ? 'text-emerald-400' : 'text-red-400';
 
     return (
@@ -63,25 +62,18 @@ const ZReport = ({ transactions }) => {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Net Ciro */}
                 <div className={`bg-slate-800 p-5 rounded-2xl border ${report.netCiro >= 0 ? 'border-emerald-500/30' : 'border-red-500/30'} flex flex-col justify-between`}>
-                    <p className="text-xs text-slate-400 font-bold uppercase">Net Kasa (Ciro - Gider)</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase">Net Kasa</p>
                     <h3 className={`text-2xl font-extrabold ${color} mt-1`}>{formatCurrency(report.netCiro)} ₺</h3>
                 </div>
-
-                {/* Toplam Satış (Gross Ciro) */}
                 <div className="bg-slate-800 p-5 rounded-2xl border border-indigo-500/30">
                     <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1"><Coffee size={14}/> Brüt Ciro</p>
                     <h3 className="text-2xl font-extrabold text-white mt-1">{formatCurrency(report.grossSales)} ₺</h3>
                 </div>
-                
-                {/* Nakit Satış */}
                 <div className="bg-slate-800 p-5 rounded-2xl border border-amber-500/30">
                     <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1"><Banknote size={14}/> Nakit Satış</p>
                     <h3 className="text-2xl font-extrabold text-amber-400 mt-1">{formatCurrency(report.cashSales)} ₺</h3>
                 </div>
-
-                {/* Kart Satış */}
                 <div className="bg-slate-800 p-5 rounded-2xl border border-blue-500/30">
                     <p className="text-xs text-slate-400 font-bold uppercase flex items-center gap-1"><CreditCard size={14}/> Kart Satış</p>
                     <h3 className="text-2xl font-extrabold text-blue-400 mt-1">{formatCurrency(report.cardSales)} ₺</h3>
@@ -97,14 +89,9 @@ const ZReport = ({ transactions }) => {
                 </div>
             </div>
 
-            <button 
-                onClick={handlePrintZReport} 
-                className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold flex items-center justify-center gap-3 transition-colors shadow-lg shadow-pink-900/30"
-            >
+            <button onClick={handlePrintZReport} className="w-full py-4 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold flex items-center justify-center gap-3 transition-colors shadow-lg shadow-pink-900/30">
                 <Printer size={20}/> Z RAPORUNU YAZDIR
             </button>
-
-            {/* GİZLİ FİŞ BİLEŞENİ (Yazdırma sırasında devreye girer) */}
             <Receipt data={printData} />
         </div>
     );

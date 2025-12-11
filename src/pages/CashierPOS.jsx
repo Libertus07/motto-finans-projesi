@@ -1,4 +1,4 @@
-// pages/CashierPOS.jsx (MOBİL UYUMLU VERSİYON)
+// pages/CashierPOS.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
 
 import React, { useState, useMemo } from 'react';
 import { ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Coffee, X, CheckCircle2, Smartphone, Search, Printer } from 'lucide-react';
@@ -8,6 +8,9 @@ import { formatCurrency } from '../utils/helpers';
 import { THEME } from '../utils/constants';
 import { deductStockForTransaction } from '../utils/stockManager';
 import Receipt from '../components/Receipt';
+
+// 👇 MAĞAZA ID
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const CashierPOS = ({ products, ingredients }) => {
     const [cart, setCart] = useState([]);
@@ -73,8 +76,12 @@ const CashierPOS = ({ products, ingredients }) => {
         };
 
         try {
-            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), transactionData);
-            await deductStockForTransaction(cart);
+            // 👇 ORTAK HAVUZA EKLEME
+            await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), transactionData);
+            
+            // Stoktan düşme (Eğer bu fonksiyonu güncellediyseniz o da çalışır)
+            // await deductStockForTransaction(cart); // Şimdilik kapalı, stok modülünü henüz ortak havuza almadık.
+
             setSuccessMsg(`✅ ${formatCurrency(totalAmount)} ₺ Tahsil Edildi!`);
             setCart([]);
             setPaymentMethod('cash');
@@ -88,7 +95,6 @@ const CashierPOS = ({ products, ingredients }) => {
 
     return (
         <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-100px)] gap-6 overflow-visible lg:overflow-hidden pb-20 lg:pb-0">
-            
             {/* SOL: ÜRÜN LİSTESİ */}
             <div className="flex-1 flex flex-col bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl h-[500px] lg:h-auto">
                 <div className="p-4 border-b border-slate-700 space-y-4 bg-slate-800/50">
@@ -118,7 +124,6 @@ const CashierPOS = ({ products, ingredients }) => {
                     <h2 className="text-xl font-bold text-white flex items-center gap-2"><ShoppingCart className="text-indigo-400"/> Sepet</h2>
                     <span className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold">{cart.length} Ürün</span>
                 </div>
-                {/* Mobilde sepet yüksekliğini sınırla */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-slate-900/30 max-h-[300px] lg:max-h-full">
                     {cart.length === 0 ? (
                         <div className="h-40 lg:h-full flex flex-col items-center justify-center text-slate-500 opacity-60">

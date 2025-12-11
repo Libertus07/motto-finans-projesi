@@ -1,4 +1,4 @@
-// pages/Settings.jsx (TAMAMEN PROFESYONEL)
+// pages/Settings.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
 
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, Database, Trash2, Target, Building2, User, Zap, FileText, Loader2 } from 'lucide-react';
@@ -7,54 +7,53 @@ import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import { INITIAL_TRANSACTIONS, INITIAL_PRODUCTS, INITIAL_DEBTS, INITIAL_INVESTMENTS, INITIAL_QUICK_ACTIONS, INITIAL_INGREDIENTS, INITIAL_NOTES, INITIAL_TABLES } from '../utils/constants';
 import ConfirmationModal from '../components/ConfirmationModal';
-import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
+import InfoModal from '../components/InfoModal'; 
+
+// 👇 MAĞAZA ID
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) => {
     const [dbLoading, setDbLoading] = useState(false);
-    const user = auth.currentUser;
-    
     const [confirmModal, setConfirmModal] = useState({ open: false, type: '', title: '', message: '', action: null });
-    // 👇 Info Modal State
     const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
     const handleUpdateGoal = async (val) => {
         setMonthlyGoal(val);
-        if(user) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'monthlyGoal'), { value: Number(val) });
+        // 👇 ORTAK HAVUZ GÜNCELLEME
+        await setDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'monthlyGoal'), { value: Number(val) });
     };
 
     const handleUpdateFixedCost = async (field, val) => {
         const newCosts = { ...fixedCosts, [field]: Number(val) };
         setFixedCosts(newCosts);
-        if(user) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'fixedCosts'), newCosts);
+        // 👇 ORTAK HAVUZ GÜNCELLEME
+        await setDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'fixedCosts'), newCosts);
     };
 
     const seedDemoData = async () => {
-        if (!user) return;
         setDbLoading(true);
-        const userId = user.uid;
         const batch = writeBatch(db);
 
-        // ... (Veri setleri aynı)
-        INITIAL_TRANSACTIONS.forEach(t => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'transactions')), t));
-        INITIAL_PRODUCTS.forEach(p => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'products')), p));
-        INITIAL_DEBTS.forEach(d => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'debts')), d));
-        INITIAL_INVESTMENTS.forEach(i => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'investments')), i));
-        INITIAL_QUICK_ACTIONS.forEach(qa => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'quickActions')), qa));
-        INITIAL_INGREDIENTS.forEach(ing => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'ingredients')), ing));
-        INITIAL_NOTES.forEach(n => batch.set(doc(collection(db, 'artifacts', appId, 'users', userId, 'notes')), n));
+        // 👇 TÜM YAZMA İŞLEMLERİ 'shops/CURRENT_SHOP_ID' ALTINA
+        INITIAL_TRANSACTIONS.forEach(t => batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions')), t));
+        INITIAL_PRODUCTS.forEach(p => batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'products')), p));
+        INITIAL_DEBTS.forEach(d => batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'debts')), d));
+        INITIAL_INVESTMENTS.forEach(i => batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'investments')), i));
+        INITIAL_QUICK_ACTIONS.forEach(qa => batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'quickActions')), qa));
+        INITIAL_INGREDIENTS.forEach(ing => batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients')), ing));
+        INITIAL_NOTES.forEach(n => batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'notes')), n));
         
         if (INITIAL_TABLES) {
             INITIAL_TABLES.forEach(t => {
-                batch.set(doc(db, 'artifacts', appId, 'users', userId, 'tables', t.id), t);
+                batch.set(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', t.id), t);
             });
         }
 
-        batch.set(doc(db, 'artifacts', appId, 'users', userId, 'settings', 'fixedCosts'), { rent: 0, staff: 0, bills: 0, other: 0 });
-        batch.set(doc(db, 'artifacts', appId, 'users', userId, 'settings', 'monthlyGoal'), { value: 120000 });
+        batch.set(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'fixedCosts'), { rent: 0, staff: 0, bills: 0, other: 0 });
+        batch.set(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'monthlyGoal'), { value: 120000 });
 
         try { 
             await batch.commit(); 
-            // 👇 Alert yerine InfoModal
             setInfoModal({ isOpen: true, type: 'success', title: 'İşlem Başarılı', message: 'Örnek veriler ve masalar başarıyla yüklendi.' });
         } catch (e) { 
             setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: e.message });
@@ -66,17 +65,16 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
 
     const handleHardReset = async () => {
         setDbLoading(true);
-        const userId = user.uid;
-        const collections = ['transactions', 'products', 'debts', 'investments', 'quickActions', 'ingredients', 'notes', 'tables'];
+        const collections = ['transactions', 'products', 'debts', 'investments', 'quickActions', 'ingredients', 'notes', 'tables', 'staff'];
         
         try {
             for (const colName of collections) {
-                const snapshot = await getDocs(collection(db, 'artifacts', appId, 'users', userId, colName));
+                // 👇 ORTAK HAVUZDAN SİLME
+                const snapshot = await getDocs(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, colName));
                 const batch = writeBatch(db);
                 snapshot.docs.forEach((doc) => batch.delete(doc.ref));
                 await batch.commit();
             }
-            // 👇 Alert yerine InfoModal
             setInfoModal({ isOpen: true, type: 'success', title: 'Temizlendi', message: 'Tüm veriler başarıyla silindi ve sistem sıfırlandı.' });
         } catch (e) { 
             setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: e.message });
@@ -98,25 +96,8 @@ const Settings = ({ monthlyGoal, setMonthlyGoal, fixedCosts, setFixedCosts }) =>
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-             
-             <ConfirmationModal 
-                isOpen={confirmModal.open}
-                onClose={() => setConfirmModal({ ...confirmModal, open: false })}
-                onConfirm={confirmModal.action}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                type={confirmModal.type}
-                loading={dbLoading}
-             />
-             
-             {/* 👇 INFO MODAL EKLENDİ */}
-             <InfoModal
-                isOpen={infoModal.isOpen}
-                onClose={() => setInfoModal({ ...infoModal, isOpen: false })}
-                type={infoModal.type}
-                title={infoModal.title}
-                message={infoModal.message}
-             />
+             <ConfirmationModal isOpen={confirmModal.open} onClose={() => setConfirmModal({ ...confirmModal, open: false })} onConfirm={confirmModal.action} title={confirmModal.title} message={confirmModal.message} type={confirmModal.type} loading={dbLoading}/>
+             <InfoModal isOpen={infoModal.isOpen} onClose={() => setInfoModal({ ...infoModal, isOpen: false })} type={infoModal.type} title={infoModal.title} message={infoModal.message}/>
 
              <div className="flex justify-between items-center">
                 <div><h2 className="text-2xl font-bold text-white flex items-center gap-2"><SettingsIcon className="text-indigo-400"/> Ayarlar</h2><p className="text-sm text-slate-400">Sistem yapılandırması.</p></div>

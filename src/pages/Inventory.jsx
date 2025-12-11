@@ -1,25 +1,23 @@
-// pages/Inventory.jsx (PROFESYONEL POPUP'LAR EKLENMİŞ SON HALİ)
+// pages/Inventory.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
 
 import React, { useState, useMemo } from 'react';
-import { Truck, PlusCircle, AlertTriangle, Trash2, Box, RefreshCw, Loader2, ChefHat, Edit, X, Database } from 'lucide-react'; 
+import { Truck, PlusCircle, AlertTriangle, Trash2, Box, RefreshCw, Loader2, ChefHat, Database } from 'lucide-react'; 
 import { addDoc, doc, collection, writeBatch, updateDoc, deleteDoc } from 'firebase/firestore'; 
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import ConfirmationModal from '../components/ConfirmationModal';
-import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
+import InfoModal from '../components/InfoModal';
+
+// 👇 MAĞAZA ID
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const Inventory = ({ ingredients, debts }) => {
     const [newPurchase, setNewPurchase] = useState({ supplier: '', amount: '', quantity: '', ingredientId: '', isDebt: false });
     const [processing, setProcessing] = useState(false);
     const [newIngredient, setNewIngredient] = useState({ name: '', unit: 'kg', price: '', stock: '' });
-    
-    // Modal State'leri
-    const [deleteData, setDeleteData] = useState(null); // { id, name }
-    
-    // 👇 Info Modal State'i
+    const [deleteData, setDeleteData] = useState(null); 
     const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
-    // --- STOK VE TEDARİKÇİ HESAPLAMALARI ---
     const stockStats = useMemo(() => {
         const totalValue = ingredients.reduce((sum, ing) => sum + (ing.price * (ing.stock || 0)), 0);
         const lowStockCount = ingredients.filter(ing => (ing.stock || 0) < 5).length;
@@ -29,31 +27,27 @@ const Inventory = ({ ingredients, debts }) => {
     
     const lowStockIngredients = ingredients.filter(ing => (ing.stock || 0) < 5);
     
+    // --- HAMMADDE EKLEME (ORTAK HAVUZ) ---
     const handleAddIngredient = async () => {
         if (!newIngredient.name || !newIngredient.price) return;
-        const user = auth.currentUser;
         try {
-            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'ingredients'), {
+            await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients'), {
                 name: newIngredient.name, unit: newIngredient.unit, price: Number(newIngredient.price) || 0, stock: Number(newIngredient.stock) || 0, order: ingredients.length + 1
             });
             setNewIngredient({ name: '', unit: 'kg', price: '', stock: '' });
-            // İsteğe bağlı: Başarılı ekleme mesajı da gösterilebilir
         } catch (error) { console.error(error); }
     };
 
     const handleUpdateIngredient = async (id, field, value) => {
-        const user = auth.currentUser;
         const val = (field === 'price' || field === 'stock') ? Number(value) : value;
         if ((field === 'price' || field === 'stock') && (isNaN(val) || val < 0)) return;
-        try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', id), { [field]: val }); } catch (error) { console.error(error); }
+        await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients', id), { [field]: val });
     };
     
-    // Modal Onaylı Silme Fonksiyonu
     const confirmDelete = async () => {
         if (!deleteData) return;
-        const user = auth.currentUser;
         try {
-            await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', deleteData.id));
+            await deleteDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients', deleteData.id));
             setDeleteData(null);
         } catch (error) { 
             console.error(error); 
@@ -61,14 +55,13 @@ const Inventory = ({ ingredients, debts }) => {
         }
     };
 
-    // 👇 GÜNCELLENEN ALIM KAYDETME FONKSİYONU
+    // --- ALIM KAYDETME (ORTAK HAVUZ & KASA & BORÇ) ---
     const handleRecordPurchase = async () => {
         if (!newPurchase.ingredientId || !newPurchase.amount || !newPurchase.quantity || !newPurchase.supplier) {
             setInfoModal({ isOpen: true, type: 'warning', title: 'Eksik Bilgi', message: 'Lütfen tüm alanları doldurunuz.' });
             return;
         }
 
-        const user = auth.currentUser;
         setProcessing(true);
         const ingredient = ingredients.find(i => i.id === newPurchase.ingredientId);
         const purchaseAmount = Number(newPurchase.amount);
@@ -76,21 +69,22 @@ const Inventory = ({ ingredients, debts }) => {
         const batch = writeBatch(db);
 
         try {
-            const ingRef = doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', newPurchase.ingredientId);
+            const ingRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients', newPurchase.ingredientId);
             const newStock = (ingredient.stock || 0) + purchaseQuantity;
-            
-            // Ortalama maliyet hesabı yerine son alım fiyatını güncelleyebiliriz veya ortalama alabiliriz.
-            // Burada basitlik adına yeni birim fiyatı güncelliyoruz.
             const newPrice = purchaseAmount / purchaseQuantity; 
+            
+            // 1. Stoku Güncelle
             batch.update(ingRef, { stock: newStock, price: newPrice });
 
             if (newPurchase.isDebt) {
-                batch.set(doc(collection(db, 'artifacts', appId, 'users', user.uid, 'debts')), {
+                // 2a. Borç Olarak Kaydet (Veresiye Defteri)
+                batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'debts')), {
                     supplier: newPurchase.supplier, amount: purchaseAmount, dueDate: new Date().toISOString().split('T')[0],
                     note: `${ingredient.name} alımı (${purchaseQuantity} ${ingredient.unit})`, type: 'debt', createdAt: Date.now(),
                 });
             } else {
-                batch.set(doc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions')), {
+                // 2b. Gider Olarak Kaydet (Kasa)
+                batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions')), {
                     date: new Date().toISOString().split('T')[0], type: 'expense', amount: purchaseAmount,
                     desc: `${newPurchase.supplier} - ${ingredient.name} alımı`, method: 'cash', category: 'Stok (Fatura)',
                 });
@@ -98,13 +92,7 @@ const Inventory = ({ ingredients, debts }) => {
             await batch.commit();
             setNewPurchase({ supplier: '', amount: '', quantity: '', ingredientId: '', isDebt: false });
             
-            // 👇 Başarılı işlem modalı
-            setInfoModal({ 
-                isOpen: true, 
-                type: 'success', 
-                title: 'Alım Kaydedildi', 
-                message: `${purchaseQuantity} ${ingredient.unit} ${ingredient.name} stoğa eklendi ve ${newPurchase.isDebt ? 'borç' : 'gider'} kaydı oluşturuldu.` 
-            });
+            setInfoModal({ isOpen: true, type: 'success', title: 'Alım Kaydedildi', message: `${purchaseQuantity} ${ingredient.unit} ${ingredient.name} stoğa eklendi.` });
 
         } catch (error) { 
             console.error(error);
@@ -116,30 +104,12 @@ const Inventory = ({ ingredients, debts }) => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-             
-             {/* 👇 MODALLAR */}
-             <ConfirmationModal 
-                isOpen={!!deleteData} 
-                onClose={() => setDeleteData(null)} 
-                onConfirm={confirmDelete}
-                title="Hammaddeyi Sil" 
-                message={`"${deleteData?.name}" adlı hammaddeyi silmek istediğinize emin misiniz?`}
-             />
-
-             <InfoModal 
-                isOpen={infoModal.isOpen} 
-                onClose={() => setInfoModal({ ...infoModal, isOpen: false })} 
-                type={infoModal.type} 
-                title={infoModal.title} 
-                message={infoModal.message} 
-             />
+             <ConfirmationModal isOpen={!!deleteData} onClose={() => setDeleteData(null)} onConfirm={confirmDelete} title="Hammaddeyi Sil" message={`"${deleteData?.name}" adlı hammaddeyi silmek istediğinize emin misiniz?`}/>
+             <InfoModal isOpen={infoModal.isOpen} onClose={() => setInfoModal({ ...infoModal, isOpen: false })} type={infoModal.type} title={infoModal.title} message={infoModal.message}/>
 
              <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Truck className="text-orange-400"/> Stok & Tedarikçi Yönetimi</h2>
-                <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-right">
-                   <div className="text-xs text-slate-400 font-bold uppercase">Toplam Stok Değeri</div>
-                   <div className="text-xl font-bold text-emerald-400">{formatCurrency(stockStats.totalValue)} ₺</div>
-                </div>
+                <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-right"><div className="text-xs text-slate-400 font-bold uppercase">Toplam Stok Değeri</div><div className="text-xl font-bold text-emerald-400">{formatCurrency(stockStats.totalValue)} ₺</div></div>
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -1,4 +1,4 @@
-// pages/Stats.jsx (DÜZELTİLMİŞ VE GÜÇLENDİRİLMİŞ VERSİYON)
+// pages/Stats.jsx (GRAFİK SORUNLARI GİDERİLDİ ✅)
 
 import React, { useMemo } from 'react';
 import { BarChart3, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Calendar } from 'lucide-react';

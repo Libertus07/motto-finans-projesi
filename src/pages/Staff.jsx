@@ -1,4 +1,4 @@
-// src/pages/Staff.jsx (SİLME SORUNU GİDERİLDİ - GARANTİLİ VERSİYON)
+// src/pages/Staff.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
 
 import React, { useState } from 'react';
 import { Users, UserPlus, DollarSign, Wallet, Trash2, Save, X, Clock, CreditCard, Banknote, Calendar, CheckCircle2 } from 'lucide-react';
@@ -8,24 +8,24 @@ import { formatCurrency } from '../utils/helpers';
 import ConfirmationModal from '../components/ConfirmationModal';
 import InfoModal from '../components/InfoModal';
 
+// 👇 MAĞAZA ID
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
+
 const Staff = ({ staff }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     
-    // MODAL STATE'LERİ
     const [advanceModal, setAdvanceModal] = useState({ open: false, staffId: null, staffName: '' });
     const [salaryModal, setSalaryModal] = useState({ open: false, staffId: null, staffName: '', baseSalary: 0, deduction: 0, netSalary: 0 });
     const [deleteId, setDeleteId] = useState(null); 
     const [historyDelete, setHistoryDelete] = useState(null); 
     const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
-    // FORM STATE'LERİ
     const [newStaff, setNewStaff] = useState({ name: '', role: 'Garson', salary: '', startDate: '', salaryDay: '', advances: [], payments: [] });
     const [amount, setAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash'); 
 
     const ROLES = ['Garson', 'Kasiyer', 'Barista', 'Mutfak', 'Temizlik', 'Müdür'];
 
-    // --- HESAPLAMA ---
     const calculateWorkDuration = (startDate) => {
         if (!startDate) return { text: 'Yeni Başladı' };
         const start = new Date(startDate);
@@ -61,16 +61,16 @@ const Staff = ({ staff }) => {
         setPaymentMethod('cash');
     };
 
-    // --- İŞLEMLER ---
+    // --- İŞLEMLER (ORTAK HAVUZ) ---
     
     const handleAddStaff = async () => {
-        const user = auth.currentUser;
         if (!newStaff.name || !newStaff.salary || !newStaff.salaryDay) {
             setInfoModal({ isOpen: true, type: 'warning', title: 'Eksik Bilgi', message: 'Tüm alanları doldurunuz.' });
             return;
         }
         try {
-            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'staff'), {
+            // 👇 ORTAK HAVUZA EKLEME
+            await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'staff'), {
                 ...newStaff, salary: Number(newStaff.salary), salaryDay: Number(newStaff.salaryDay), createdAt: new Date().toISOString()
             });
             setNewStaff({ name: '', role: 'Garson', salary: '', startDate: '', salaryDay: '', advances: [], payments: [] });
@@ -81,9 +81,8 @@ const Staff = ({ staff }) => {
 
     const confirmDeleteStaff = async () => {
         if (!deleteId) return;
-        const user = auth.currentUser;
         try {
-            await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'staff', deleteId));
+            await deleteDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'staff', deleteId));
             setDeleteId(null);
             setInfoModal({ isOpen: true, type: 'success', title: 'Silindi', message: 'Personel silindi.' });
         } catch (error) { setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'Silinemedi.' }); }
@@ -91,17 +90,19 @@ const Staff = ({ staff }) => {
 
     const handleGiveAdvance = async () => {
         if (!amount || amount <= 0) return;
-        const user = auth.currentUser;
         try {
             const transMethod = paymentMethod === 'cash' ? 'cash' : 'card';
             const cardBank = paymentMethod === 'cash' ? null : paymentMethod;
             
-            const transRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), {
+            // 1. KASADAN DÜŞ (ORTAK KASA)
+            const transRef = await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), {
                 type: 'expense', amount: Number(amount), category: 'Personel Avans',
-                desc: `${advanceModal.staffName} - Avans`, date: new Date().toISOString().split('T')[0], method: transMethod, cardBank: cardBank
+                desc: `${advanceModal.staffName} - Avans`, date: new Date().toISOString().split('T')[0], method: transMethod, cardBank: cardBank,
+                user: 'Sistem'
             });
 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'staff', advanceModal.staffId), {
+            // 2. PERSONELE İŞLE
+            await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'staff', advanceModal.staffId), {
                 advances: arrayUnion({ 
                     amount: Number(amount), 
                     date: new Date().toISOString(), 
@@ -113,22 +114,24 @@ const Staff = ({ staff }) => {
 
             setAdvanceModal({ open: false, staffId: null, staffName: '' }); setAmount('');
             setInfoModal({ isOpen: true, type: 'success', title: 'Avans Verildi', message: 'Tutar kasadan düşüldü.' });
-        } catch (error) { setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'İşlem yapılamadı.' }); }
+        } catch (error) { console.error(error); setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'İşlem yapılamadı.' }); }
     };
 
     const handlePaySalary = async () => {
         if (!amount || amount <= 0) return;
-        const user = auth.currentUser;
         try {
             const transMethod = paymentMethod === 'cash' ? 'cash' : 'card';
             const cardBank = paymentMethod === 'cash' ? null : paymentMethod;
             
-            const transRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), {
+            // 1. KASADAN DÜŞ (ORTAK KASA)
+            const transRef = await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), {
                 type: 'expense', amount: Number(amount), category: 'Personel Maaş',
-                desc: `${salaryModal.staffName} - Maaş Ödemesi`, date: new Date().toISOString().split('T')[0], method: transMethod, cardBank: cardBank
+                desc: `${salaryModal.staffName} - Maaş Ödemesi`, date: new Date().toISOString().split('T')[0], method: transMethod, cardBank: cardBank,
+                user: 'Sistem'
             });
 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'staff', salaryModal.staffId), {
+            // 2. PERSONELE İŞLE
+            await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'staff', salaryModal.staffId), {
                 payments: arrayUnion({ 
                     amount: Number(amount), 
                     date: new Date().toISOString(), 
@@ -144,30 +147,26 @@ const Staff = ({ staff }) => {
         } catch (error) { setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'İşlem yapılamadı.' }); }
     };
 
-    // 👇 DÜZELTİLEN SİLME FONKSİYONU (ID ile GARANTİLİ SİLME)
     const confirmHistoryDelete = async () => {
         if (!historyDelete) return;
         const { staffId, item, type } = historyDelete;
-        const user = auth.currentUser;
 
         try {
-            // 1. Personel Verisini Bul
             const currentStaff = staff.find(s => s.id === staffId);
             if (!currentStaff) return;
 
-            // 2. İlgili Listeden (advances veya payments) bu ID'li öğeyi filtrele (Çıkar)
             const field = type === 'advance' ? 'advances' : 'payments';
             const currentArray = currentStaff[field] || [];
             const newArray = currentArray.filter(i => i.id !== item.id);
 
-            // 3. Yeni Listeyi Kaydet
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'staff', staffId), {
+            // 1. PERSONELDEN SİL
+            await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'staff', staffId), {
                 [field]: newArray
             });
 
-            // 4. Kasa İşlemini Sil
+            // 2. KASADAN İŞLEMİ SİL (PARAYI İADE ET)
             if (item.transactionId) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'transactions', item.transactionId));
+                await deleteDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions', item.transactionId));
             }
 
             setHistoryDelete(null);
@@ -180,19 +179,8 @@ const Staff = ({ staff }) => {
 
     return (
         <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
-            {/* MODALLAR */}
             <ConfirmationModal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={confirmDeleteStaff} title="Personeli Sil" message="Emin misiniz?" type="danger"/>
-            
-            <ConfirmationModal 
-                isOpen={!!historyDelete} 
-                onClose={() => setHistoryDelete(null)} 
-                onConfirm={confirmHistoryDelete} 
-                title="İşlemi İptal Et" 
-                message="Bu ödemeyi silmek istediğinize emin misiniz? Silinen tutar kasaya geri eklenecektir." 
-                type="warning"
-                confirmText="Evet, İptal Et"
-            />
-
+            <ConfirmationModal isOpen={!!historyDelete} onClose={() => setHistoryDelete(null)} onConfirm={confirmHistoryDelete} title="İşlemi İptal Et" message="Bu ödemeyi silmek istediğinize emin misiniz? Tutar kasaya geri eklenecektir." type="warning" confirmText="Evet, İptal Et"/>
             <InfoModal isOpen={infoModal.isOpen} onClose={() => setInfoModal({ ...infoModal, isOpen: false })} type={infoModal.type} title={infoModal.title} message={infoModal.message}/>
 
             <div className="flex justify-between items-end border-b border-slate-800 pb-6">

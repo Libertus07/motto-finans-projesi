@@ -1,17 +1,21 @@
-// pages/Transactions.jsx (TAMAMEN PROFESYONEL)
+// pages/Transactions.jsx (FileText IMPORT HATASI DÜZELTİLDİ ✅)
 
-import React, { useState } from 'react';
-import { Trash2, PlusCircle, MinusCircle, Zap, Settings, X, RefreshCw, FileText, CreditCard, Banknote, Smartphone, ChevronDown, History, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { addDoc, deleteDoc, updateDoc, doc, collection, writeBatch } from 'firebase/firestore';
+import React, { useState, useMemo } from 'react';
+// 👇 FileText EKLENDİ
+import { ArrowUpCircle, ArrowDownCircle, Search, Filter, Trash2, Calendar, Wallet, CreditCard, Banknote, Plus, Minus, RefreshCw, Zap, Settings, History, ArrowUpRight, ArrowDownRight, PlusCircle, MinusCircle, X, FileText } from 'lucide-react';
+import { addDoc, deleteDoc, doc, collection, writeBatch } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
-import { formatCurrency, getSubMethod, formatDate } from '../utils/helpers';
-import { THEME } from '../utils/constants';
+import { formatCurrency, formatDate, getSubMethod } from '../utils/helpers';
 import ConfirmationModal from '../components/ConfirmationModal';
-import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
+import InfoModal from '../components/InfoModal';
+import { THEME } from '../utils/constants';
+
+// 👇 MAĞAZA ID
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const BankSelector = ({ newTrans, setNewTrans }) => {
     const bankOptions = [
-        { key: 'ziraat', label: 'ZİRAAT', color: newTrans.type === 'income' ? 'bg-red-600 border-red-500' : 'bg-red-600 border-red-500' }, 
+        { key: 'ziraat', label: 'ZİRAAT', color: newTrans.type === 'income' ? 'bg-emerald-600 border-emerald-500' : 'bg-red-600 border-red-500' }, 
         { key: 'halk', label: 'HALK', color: newTrans.type === 'income' ? 'bg-blue-600 border-blue-500' : 'bg-blue-600 border-blue-500' },
         { key: 'iban', label: 'DİĞER', icon: <Smartphone size={14}/>, color: newTrans.type === 'income' ? 'bg-purple-600 border-purple-500' : 'bg-purple-600 border-purple-500' },
     ];
@@ -44,9 +48,7 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
     const [newShortcut, setNewShortcut] = useState({ label: '', type: 'expense', method: 'cash', cardBank: 'ziraat', category: 'Günlük', desc: '', icon: '⚡' });
     const [transferData, setTransferData] = useState({ from: 'ziraat', to: 'cash', amount: '', desc: '' });
     
-    // Modal State'leri
     const [deleteId, setDeleteId] = useState(null);
-    // 👇 Info Modal State
     const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
     const handleAddTransaction = async () => {
@@ -57,30 +59,36 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
             desc: newTrans.desc || (newTrans.type === 'income' ? 'Satış' : 'Gider'),
             subMethod: getSubMethod(newTrans),
             cardBank: newTrans.method === 'card' ? newTrans.cardBank : null, 
-            category: newTrans.type === 'expense' ? newTrans.category : null
+            category: newTrans.type === 'expense' ? newTrans.category : null,
+            user: isPatron ? 'Patron' : 'Personel'
         };
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), newItem);
+        // 👇 ORTAK HAVUZA EKLEME
+        await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), newItem);
         setNewTrans({ ...newTrans, amount: '', desc: '' });
+        setInfoModal({ isOpen: true, type: 'success', title: 'Başarılı', message: 'İşlem kaydedildi.' });
     };
 
     const confirmDelete = async () => {
         if(!deleteId) return;
-        const user = auth.currentUser;
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'transactions', deleteId));
-        setDeleteId(null);
+        try {
+            // 👇 ORTAK HAVUZDAN SİLME
+            await deleteDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions', deleteId));
+            setDeleteId(null);
+            setInfoModal({ isOpen: true, type: 'success', title: 'Silindi', message: 'Kayıt silindi.' });
+        } catch (e) {
+            setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'Silinemedi.' });
+        }
     };
 
     const handleAddQuickAction = async () => {
         if (!newShortcut.label) return;
-        const user = auth.currentUser;
         const order = quickActions.length > 0 ? quickActions[quickActions.length - 1].order + 1 : 1;
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'quickActions'), { ...newShortcut, order });
+        await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'quickActions'), { ...newShortcut, order });
         setNewShortcut({ label: '', type: 'expense', method: 'cash', cardBank: 'ziraat', category: 'Günlük', desc: '', icon: '⚡' });
     };
 
     const handleDeleteQuickAction = async (id) => {
-        const user = auth.currentUser;
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quickActions', id));
+        await deleteDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'quickActions', id));
     };
 
     const applyQuickAction = (action) => {
@@ -94,9 +102,8 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
     const handleAssetTransfer = async () => {
         const { from, to, amount, desc } = transferData;
         if(Number(amount) <= 0 || from === to) return;
-        const user = auth.currentUser;
         const batch = writeBatch(db);
-        const ref = collection(db, 'artifacts', appId, 'users', user.uid, 'transactions');
+        const ref = collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'); // 👇 ORTAK REF
         
         const expense = { 
             date: new Date().toISOString().split('T')[0], type: 'expense', amount: Number(amount), 
@@ -111,31 +118,14 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
         batch.set(doc(ref), income);
         await batch.commit();
         
-        // 👇 Alert yerine InfoModal
         setInfoModal({ isOpen: true, type: 'success', title: 'Transfer Başarılı', message: `${formatCurrency(amount)} ₺ başarıyla transfer edildi.` });
-        
         setTransferData({ from: 'ziraat', to: 'cash', amount: '', desc: '' });
     };
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-right duration-500">
-             
-             <ConfirmationModal 
-                isOpen={!!deleteId} 
-                onClose={() => setDeleteId(null)} 
-                onConfirm={confirmDelete}
-                title="İşlemi Sil" 
-                message="Bu finansal kaydı silmek istediğinize emin misiniz?"
-             />
-             
-             {/* 👇 INFO MODAL EKLENDİ */}
-             <InfoModal
-                isOpen={infoModal.isOpen}
-                onClose={() => setInfoModal({ ...infoModal, isOpen: false })}
-                type={infoModal.type}
-                title={infoModal.title}
-                message={infoModal.message}
-             />
+             <ConfirmationModal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={confirmDelete} title="İşlemi Sil" message="Bu kaydı silmek istediğinize emin misiniz?"/>
+             <InfoModal isOpen={infoModal.isOpen} onClose={() => setInfoModal({ ...infoModal, isOpen: false })} type={infoModal.type} title={infoModal.title} message={infoModal.message}/>
 
              <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">Yeni İşlem Gir</h2>
@@ -232,7 +222,7 @@ const Transactions = ({ transactions, quickActions, isPatron }) => {
                 <div className={`${THEME.card} p-6 rounded-2xl border ${THEME.border} flex flex-col h-[600px]`}>
                     <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-4"><h3 className="font-bold text-white flex items-center gap-2"><History size={18} className="text-indigo-400"/> İşlem Geçmişi</h3><div className="flex gap-2"><button className="p-1.5 hover:bg-slate-800 rounded text-slate-500 hover:text-white transition-colors"><Filter size={16}/></button></div></div>
                     <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                        {transactions.map((t) => (<div key={t.id} className="flex justify-between items-center p-3 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-slate-600 transition-all group"><div className="flex items-center gap-3 overflow-hidden"><div className={`p-2.5 rounded-lg shrink-0 ${t.type === 'income' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>{t.type === 'income' ? <ArrowUpRight size={18}/> : <ArrowDownRight size={18}/>}</div><div className="min-w-0"><div className="font-bold text-sm text-slate-200 truncate">{t.desc}</div><div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5"><span>{formatDate(t.date)}</span><span className="w-1 h-1 rounded-full bg-slate-600"></span><span className="uppercase tracking-wider">{getSubMethod(t)}</span></div></div></div><div className="flex items-center gap-4 shrink-0 pl-2"><span className={`font-mono font-bold text-sm ${t.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>{t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}</span><button onClick={() => setDeleteId(t.id)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-slate-800 rounded"><Trash2 size={16}/></button></div></div>))}
+                        {transactions.map((t) => (<div key={t.id} className="flex justify-between items-center p-3 bg-slate-900/50 rounded-xl border border-slate-800 hover:border-slate-600 transition-all group"><div className="flex items-center gap-3 overflow-hidden"><div className={`p-2.5 rounded-lg shrink-0 ${t.type === 'income' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>{t.type === 'income' ? <ArrowUpRight size={18}/> : <ArrowDownRight size={18}/>}</div><div className="min-w-0"><div className="font-bold text-sm text-slate-200 truncate">{t.desc}</div><div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5"><span>{formatDate(t.date)}</span><span className="w-1 h-1 rounded-full bg-slate-600"></span><span className="uppercase tracking-wider">{getSubMethod(t)}</span></div></div></div><div className="flex items-center gap-4 shrink-0 pl-2"><span className={`font-mono font-bold text-sm ${t.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>{t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}</span>{isPatron && (<button onClick={() => setDeleteId(t.id)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-slate-800 rounded"><Trash2 size={16}/></button>)}</div></div>))}
                     </div>
                 </div>
              </div>

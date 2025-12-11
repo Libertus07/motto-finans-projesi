@@ -1,12 +1,15 @@
-// pages/Recipe.jsx (INFO MODAL EKLENMİŞ VE STOK ENTEGRASYONLU SON HALİ)
+// pages/Recipe.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
 
 import React, { useState, useEffect } from 'react';
-import { ChefHat, Package, Settings, Move, PlusCircle, AlertTriangle, Scale, X, Loader2, Wand2, Sparkles, Trash2, Save, CheckCircle2 } from 'lucide-react';
+import { ChefHat, Package, Settings, Move, PlusCircle, AlertTriangle, Scale, X, Loader2, Wand2, Sparkles, Trash2, Save } from 'lucide-react';
 import { addDoc, deleteDoc, updateDoc, setDoc, doc, collection, getDoc } from 'firebase/firestore'; 
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import ConfirmationModal from '../components/ConfirmationModal';
-import InfoModal from '../components/InfoModal'; // 👇 YENİ IMPORT
+import InfoModal from '../components/InfoModal'; 
+
+// 👇 MAĞAZA ID
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const Recipe = ({ ingredients, products }) => { 
     const [isEditingIngredients, setIsEditingIngredients] = useState(false);
@@ -19,14 +22,11 @@ const Recipe = ({ ingredients, products }) => {
     const [aiLoading, setAiLoading] = useState(false);
     const [aiRecipeAdvice, setAiRecipeAdvice] = useState("");
     
-    // Modal State'leri
     const [deleteId, setDeleteId] = useState(null);
     const [saving, setSaving] = useState(false);
-    
-    // 👇 Info Modal State'i
     const [infoModal, setInfoModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
-    // Seçilen ürün değiştiğinde reçeteyi getir
+    // Seçilen ürün değiştiğinde reçeteyi getir (ORTAK HAVUZDAN)
     useEffect(() => {
         const fetchRecipe = async () => {
             if (!selectedProductId) {
@@ -34,10 +34,8 @@ const Recipe = ({ ingredients, products }) => {
                 return;
             }
             
-            const user = auth.currentUser;
-            if(!user) return;
-
-            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'recipes', selectedProductId);
+            // 👇 ORTAK HAVUZDAN OKUMA
+            const docRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'recipes', selectedProductId);
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
@@ -49,31 +47,31 @@ const Recipe = ({ ingredients, products }) => {
         fetchRecipe();
     }, [selectedProductId]);
 
-    // --- HAMMADDE YÖNETİMİ ---
+    // --- HAMMADDE YÖNETİMİ (ORTAK HAVUZ) ---
     const handleAddIngredient = async () => {
         if (!newIngredient.name || !newIngredient.price) return;
-        const user = auth.currentUser;
         const ingData = {
             name: newIngredient.name, unit: newIngredient.unit, price: Number(newIngredient.price) || 0, stock: Number(newIngredient.stock) || 0, order: ingredients.length + 1
         };
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'ingredients'), ingData);
+        // 👇 ORTAK HAVUZA EKLEME
+        await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients'), ingData);
         setNewIngredient({ name: '', unit: 'kg', price: '', stock: '' });
     };
 
     const handleUpdateIngredient = async (id, field, value) => {
-        const user = auth.currentUser;
         const val = (field === 'price' || field === 'stock') ? Number(value) : value;
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', id), { [field]: val });
+        // 👇 ORTAK HAVUZ GÜNCELLEME
+        await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients', id), { [field]: val });
     };
 
     const confirmDelete = async () => {
         if (!deleteId) return;
-        const user = auth.currentUser;
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'ingredients', deleteId));
+        // 👇 ORTAK HAVUZ SİLME
+        await deleteDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients', deleteId));
         setDeleteId(null);
     };
 
-    // --- REÇETE OLUŞTURMA MANTIĞI ---
+    // --- REÇETE MANTIĞI (Aynı kalıyor) ---
     const addIngredientToRecipe = (id) => {
         const ing = ingredients.find(i => i.id === id);
         if (!ing) return;
@@ -93,23 +91,18 @@ const Recipe = ({ ingredients, products }) => {
         setRecipeBuilder(prev => ({ ...prev, items: prev.items.filter(item => item.id !== id) }));
     };
 
-    // 👇 GÜNCELLENEN KAYDETME FONKSİYONU (InfoModal kullanıyor)
+    // --- REÇETEYİ KAYDETME (ORTAK HAVUZ) ---
     const handleSaveRecipe = async () => {
         if (!selectedProductId) {
             setInfoModal({ isOpen: true, type: 'warning', title: 'Ürün Seçilmedi', message: 'Lütfen reçeteyi kaydetmek için önce bir ürün seçin.' });
             return;
         }
         
-        const user = auth.currentUser;
         setSaving(true);
         try {
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'recipes', selectedProductId), recipeBuilder);
-            setInfoModal({ 
-                isOpen: true, 
-                type: 'success', 
-                title: 'Reçete Kaydedildi', 
-                message: 'Reçete başarıyla sisteme işlendi. Artık bu ürün satıldığında stoktan otomatik düşecek.' 
-            });
+            // 👇 ORTAK HAVUZA KAYDETME
+            await setDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'recipes', selectedProductId), recipeBuilder);
+            setInfoModal({ isOpen: true, type: 'success', title: 'Reçete Kaydedildi', message: 'Reçete başarıyla sisteme işlendi.' });
         } catch (error) {
             console.error(error);
             setInfoModal({ isOpen: true, type: 'error', title: 'Hata', message: 'Reçete kaydedilirken bir sorun oluştu.' });
@@ -142,23 +135,8 @@ const Recipe = ({ ingredients, products }) => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-             
-             {/* 👇 MODALLAR */}
-             <ConfirmationModal 
-                isOpen={!!deleteId} 
-                onClose={() => setDeleteId(null)} 
-                onConfirm={confirmDelete} 
-                title="Malzeme Silinsin mi?" 
-                message="Bu malzemeyi silmek istediğinize emin misiniz? Reçeteler etkilenebilir." 
-             />
-             
-             <InfoModal 
-                isOpen={infoModal.isOpen} 
-                onClose={() => setInfoModal({ ...infoModal, isOpen: false })} 
-                type={infoModal.type} 
-                title={infoModal.title} 
-                message={infoModal.message} 
-             />
+             <ConfirmationModal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={confirmDelete} title="Malzeme Silinsin mi?" message="Bu malzemeyi silmek istediğinize emin misiniz? Reçeteler etkilenebilir." />
+             <InfoModal isOpen={infoModal.isOpen} onClose={() => setInfoModal({ ...infoModal, isOpen: false })} type={infoModal.type} title={infoModal.title} message={infoModal.message}/>
 
              <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-white flex items-center gap-2"><ChefHat className="text-orange-500"/> Reçete & Maliyet</h2></div>
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -252,7 +230,6 @@ const Recipe = ({ ingredients, products }) => {
                             <button onClick={generateRecipeAdvice} disabled={aiLoading} className="py-3 rounded-xl font-bold bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 flex items-center justify-center gap-2">
                                 {aiLoading ? <Loader2 className="animate-spin" size={18}/> : <Wand2 size={18}/>} AI Analizi
                             </button>
-                            {/* 👇 KAYDET BUTONU */}
                             <button onClick={handleSaveRecipe} disabled={saving} className="py-3 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 disabled:opacity-50">
                                 {saving ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} REÇETEYİ KAYDET
                             </button>

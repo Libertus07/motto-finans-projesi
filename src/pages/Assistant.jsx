@@ -1,12 +1,11 @@
-// pages/Assistant.jsx (GÜNCELLENMİŞ TAM İÇERİK: Bağlam Koruma Özelliği Eklendi)
+// pages/Assistant.jsx (BAĞLAM KORUMA VE İYİLEŞTİRME ✅)
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Trash2, MessageSquare, User, Loader2, Send } from 'lucide-react';
+import { Sparkles, Trash2, User, Loader2, Send } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
 import { GEMINI_API_KEY } from '../utils/constants';
 
 const Assistant = ({ stats }) => {
-    // 👇 Başlangıç mesajını ve sistemi tanıtma mesajını sisteme ekliyoruz
     const [chatMessages, setChatMessages] = useState([
         { role: 'ai', text: 'Merhaba! İşletmenle ilgili finansal sorularını cevaplamaya hazırım.' }
     ]);
@@ -16,27 +15,23 @@ const Assistant = ({ stats }) => {
 
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
-    // 👇 YENİ FONKSİYON: Sohbet geçmişini Gemini formatına dönüştürür
     const formatHistoryForAPI = (messages) => {
-        const history = messages.filter(msg => msg.role !== 'system').map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'model', // Gemini 'ai' yerine 'model' kullanır
+        return messages.filter(msg => msg.role !== 'system').map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.text }],
         }));
-        return history;
     };
 
     const handleSendMessage = async (textOverride = null) => {
         const userMessage = textOverride || chatInput.trim();
         if (!userMessage || aiLoading) return;
         
-        // Kullanıcı mesajını hemen state'e ekle
         const newUserMessage = { role: 'user', text: userMessage };
         setChatMessages(prev => [...prev, newUserMessage]);
         setChatInput("");
         setAiLoading(true);
 
         const generateLocalResponse = () => {
-            // ... (lokal cevap kodları)
             const lowerMsg = userMessage.toLowerCase();
             if (lowerMsg.includes('ciro')) return `📊 **Bugün Ciro:** ${formatCurrency(stats.dailyIncome)} ₺\n**Bu Ay:** ${formatCurrency(stats.monthlyIncome)} ₺`;
             if (lowerMsg.includes('kâr')) return `💰 **Net Kâr:** ${formatCurrency(stats.netProfit)} ₺\n**Gerçek Kâr:** ${formatCurrency(stats.netNetProfit)} ₺`;
@@ -45,47 +40,35 @@ const Assistant = ({ stats }) => {
             return "Şu an yapay zeka servisine ulaşılamıyor. 'Ciro', 'Kâr' veya 'Borç' yazarak sorgulama yapabilirsiniz.";
         };
 
-        // 👇 KRİTİK DÜZELTME: Sistem talimatını ilk mesaja ekleyerek payload'ı sadeleştiriyoruz.
         const systemPrompt = `Sen "Patron Finans" asistanısın. Para birimi: TL. Kısıtlı verileri kullan, bağlamı koru. VERİLER: Bugün Ciro: ${formatCurrency(stats.dailyIncome)}, Bu Ay: ${formatCurrency(stats.monthlyIncome)}, Net Kâr: ${formatCurrency(stats.netProfit)}, Borç: ${formatCurrency(stats.totalDebt)}.`;
         
-        // Chat geçmişini formatla ve finansal bağlamı ilk mesaja ekle (yeni bir kullanıcı mesajı oluşturarak)
         const chatHistory = formatHistoryForAPI([...chatMessages, newUserMessage]);
         
-        // Eğer bu ilk mesaj değilse, sistem talimatını eklemeye gerek yok.
         if (chatHistory.length === 1 && chatHistory[0].role === 'user') {
             chatHistory[0].parts[0].text = `${systemPrompt}\n\nSoru: ${chatHistory[0].parts[0].text}`;
         }
-        // 👆 Düzeltme sonu
 
         try {
             if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("API Anahtarı Yüklenemedi")) throw new Error("Anahtar Eksik");
             
-            // 3. API İsteği: Sadeleştirilmiş Payload (Sadece contents)
             const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST", 
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    contents: chatHistory // Sadeleştirilmiş payload
-                })
+                body: JSON.stringify({ contents: chatHistory })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({})); 
-                console.error("Gemini API HTTP Error:", response.status, errorData);
-                setChatMessages(prev => [...prev, { role: 'ai', text: `API Bağlantı Hatası: Kod ${response.status}. Lütfen .env dosyanızı kontrol edin.` }]);
-                return;
-            }
+            if (!response.ok) throw new Error(`API Hatası: ${response.status}`);
 
             const data = await response.json();
             const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
             
-            if (!aiResponse) {
-                 setChatMessages(prev => [...prev, { role: 'ai', text: "Boş cevap alındı. Belki de kota doldu veya bağlam karıştı." }]);
-                 return;
-            }
+            if (!aiResponse) throw new Error("Boş cevap");
 
-            // Doğru cevabı eklemeden önce, gönderdiğimiz yeni kullanıcı mesajını (newUserMessage) listeden çıkarıp temiz cevabı eklemeliyiz.
-            setChatMessages(prev => [...prev.slice(0, prev.length - 1), newUserMessage, { role: 'ai', text: aiResponse }]);
+            setChatMessages(prev => {
+                // Son kullanıcı mesajını geçici listeden kaldırıp temiz halini ekliyoruz (Gerekirse)
+                // Şimdilik direkt ekleme yapıyoruz, sorunsuz çalışır.
+                return [...prev, { role: 'ai', text: aiResponse }];
+            });
 
         } catch (error) {
             console.error("AI İstek Hatası:", error); 
@@ -94,8 +77,6 @@ const Assistant = ({ stats }) => {
             setAiLoading(false);
         }
     };
-
-    // ... (render return bloğu aynı kalır)
 
     return (
         <div className="max-w-4xl mx-auto h-[calc(100vh-140px)] flex flex-col animate-in slide-in-from-bottom-4 duration-500">
