@@ -1,4 +1,4 @@
-// src/App.jsx (GÜNCELLENDİ: Kasiyer'e Ürün Ekleme Yetkisi Tanımlandı)
+// src/App.jsx (GÜNCELLENDİ: Kategoriler Products Sayfasına Gönderildi ✅)
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -41,11 +41,12 @@ export default function PatronFinancePro() {
   
   const [salaryNotification, setSalaryNotification] = useState({ isOpen: false, names: '' });
 
+  // Verileri Hook'tan Çek
   const {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings,
-    staff, 
+    staff, categories, // 👈 KATEGORİLER BURAYA EKLENDİ
   } = useFinanceData(user); 
 
   useEffect(() => {
@@ -90,16 +91,14 @@ export default function PatronFinancePro() {
   if (MAINTENANCE_MODE) return <MaintenancePage />;
 
   const renderContent = () => {
-    // 1. Yetki Kontrolü: Garson ve Kasiyerin görebileceği sayfalar
     if (userRole === 'kasiyer' || userRole === 'garson') {
         const allowedTabs = userRole === 'garson' 
-            ? ['tables', 'products'] // Garson sadece Masalar ve Ürünleri görür
-            : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; // Kasiyer yetkileri
+            ? ['tables', 'products'] 
+            : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings'];
         
         if (!allowedTabs.includes(activeTab)) return <div className="text-center py-20 text-slate-500">Yetkisiz Alan</div>;
     }
 
-    // 2. Sayfa Yönlendirmeleri
     switch (activeTab) {
       case 'dashboard': return <Dashboard stats={stats} transactions={transactions} monthlyGoal={monthlyGoal} calculateFutureCashflow={calculateFutureCashflow} getProfitabilityWarnings={() => getProfitabilityWarnings(products)} tables={tables}/>;
       case 'zreport': return <ZReport transactions={transactions} />;
@@ -108,12 +107,13 @@ export default function PatronFinancePro() {
       case 'transactions': return <Transactions transactions={transactions} quickActions={quickActions} isPatron={userRole === 'patron'}/>;
       case 'debts': return <Debts debts={debts} stats={stats} />;
       
-      // 👇 BURASI GÜNCELLENDİ: 'canEdit' yetkisi eklendi (Patron VEYA Kasiyer düzenleyebilir)
+      // 👇 BURASI GÜNCELLENDİ: categories prop'u eklendi
       case 'products': return (
           <Products 
             products={products} 
-            isPatron={userRole === 'patron'} // Patron maliyetleri görür
-            canEdit={userRole === 'patron' || userRole === 'kasiyer'} // Kasiyer ve Patron ekleme/silme yapabilir
+            categories={categories} // 👈 Kategoriler sayfaya aktarıldı
+            isPatron={userRole === 'patron'} 
+            canEdit={userRole === 'patron' || userRole === 'kasiyer'} 
             userRole={userRole} 
           />
       );

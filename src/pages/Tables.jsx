@@ -1,7 +1,7 @@
-// pages/Tables.jsx (ORTAK HAVUZ SENKRONİZASYONLU ✅)
+// pages/Tables.jsx (ÜRÜN BİRLEŞTİRME ÖZELLİĞİ EKLENDİ ✅)
 
 import React, { useState, useEffect } from 'react';
-import { Table as TableIcon, Coffee, Trash2, Printer, CheckCircle2, CreditCard, Banknote, X, Sun, Cloud, Home, ArrowUp, Move, AlertTriangle } from 'lucide-react';
+import { Table as TableIcon, Coffee, Trash2, Printer, CheckCircle2, CreditCard, Banknote, X, Sun, Cloud, Home, ArrowUp, Move, AlertTriangle, CalendarClock, User, Clock, FileText } from 'lucide-react';
 import { addDoc, doc, updateDoc, collection, writeBatch } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
@@ -12,7 +12,6 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import TableCloseModal from '../components/TableCloseModal';
 import ProductOptionsModal from '../components/ProductOptionsModal'; 
 
-// 👇 DİKKAT: DİĞER SAYFALARLA AYNI SABİT MAĞAZA ADRESİ
 const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const Tables = ({ tables, products, userRole }) => { 
@@ -22,14 +21,14 @@ const Tables = ({ tables, products, userRole }) => {
     const [processing, setProcessing] = useState(false);
     const [printData, setPrintData] = useState(null);
     
-    // Modal State'leri
+    // Modals
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [isEmptyConfirmOpen, setIsEmptyConfirmOpen] = useState(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-    
-    const [productToCustomize, setProductToCustomize] = useState(null); 
+    const [isRezModalOpen, setIsRezModalOpen] = useState(false);
+    const [rezForm, setRezForm] = useState({ name: '', time: '', note: '' });
 
-    // Ödeme state'leri
+    const [productToCustomize, setProductToCustomize] = useState(null); 
     const [paymentMethod, setPaymentMethod] = useState('cash'); 
     const [cardBank, setCardBank] = useState('ziraat');
     
@@ -39,23 +38,20 @@ const Tables = ({ tables, products, userRole }) => {
         { key: 'iban', label: 'Diğer Banka / IBAN' }
     ];
 
-    // Masa verisi değiştiğinde (başka biri sipariş girdiğinde) ekranı güncelle
     useEffect(() => {
         if (!selectedTable || !tables || tables.length === 0) return;
         const latestTable = tables.find(t => t.id === selectedTable.id);
-        
-        // Eğer seçili masada bir değişiklik varsa state'i güncelle
-        if (latestTable && (latestTable.total !== selectedTable.total || latestTable.status !== selectedTable.status || latestTable.orders.length !== selectedTable.orders.length)) {
+        if (latestTable && (JSON.stringify(latestTable) !== JSON.stringify(selectedTable))) {
             setSelectedTable(latestTable);
         }
     }, [tables, selectedTable]);
 
-    // --- HELPER'LAR ---
     const getTableStatusColor = (status) => {
         switch (status) {
             case 'occupied': return 'bg-red-600 hover:bg-red-500';
             case 'ordered': return 'bg-yellow-600 hover:bg-yellow-500';
             case 'needs_cleaning': return 'bg-blue-600 hover:bg-blue-500'; 
+            case 'reserved': return 'bg-purple-600 hover:bg-purple-500'; 
             case 'empty': default: return 'bg-emerald-600 hover:bg-emerald-500';
         }
     };
@@ -65,6 +61,7 @@ const Tables = ({ tables, products, userRole }) => {
             case 'occupied': return 'DOLU';
             case 'ordered': return 'SİPARİŞ VERİLDİ';
             case 'needs_cleaning': return 'TEMİZLİK GEREKLİ';
+            case 'reserved': return 'REZERVE EDİLDİ'; 
             case 'empty': default: return 'BOŞ & TEMİZ';
         }
     };
@@ -76,37 +73,94 @@ const Tables = ({ tables, products, userRole }) => {
         return <Home size={16}/>;
     };
 
-    // --- SİPARİŞ EKLEME SÜRECİ (ORTAK HAVUZA YAZAR) ---
-    
-    const handleProductClick = (product) => {
-        setProductToCustomize(product);
+    const handleSaveReservation = async () => {
+        if (!rezForm.name || !rezForm.time) return alert("Lütfen isim ve saat giriniz.");
+        setProcessing(true);
+        try {
+            const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id);
+            await updateDoc(tableRef, {
+                status: 'reserved',
+                reservation: { customerName: rezForm.name, time: rezForm.time, note: rezForm.note || '' }
+            });
+            setIsRezModalOpen(false);
+            setRezForm({ name: '', time: '', note: '' });
+            setSelectedTable(null); 
+        } catch (error) { console.error("Rezervasyon hatası:", error); } finally { setProcessing(false); }
     };
 
+    const handleCancelReservation = async () => {
+        if (!window.confirm("Rezervasyonu iptal etmek istediğinize emin misiniz?")) return;
+        setProcessing(true);
+        try {
+            const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id);
+            await updateDoc(tableRef, { status: 'empty', reservation: null });
+            setSelectedTable(prev => ({ ...prev, status: 'empty', reservation: null }));
+        } catch (error) { console.error(error); } finally { setProcessing(false); }
+    };
+
+    const handleCustomerArrived = async () => {
+        setProcessing(true);
+        try {
+            const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id);
+            await updateDoc(tableRef, { status: 'occupied', reservation: null });
+            setSelectedTable(prev => ({ ...prev, status: 'occupied', reservation: null }));
+        } catch (error) { console.error(error); } finally { setProcessing(false); }
+    };
+
+    const handleProductClick = (product) => {
+        if (product.options && product.options.length > 0) {
+            setProductToCustomize(product);
+        } else {
+            handleConfirmOrder({ ...product, quantity: 1 });
+        }
+    };
+
+    // --- 👇 YENİ: GÜNCELLENMİŞ SİPARİŞ EKLEME (GRUPLAMA YAPAR) ---
     const handleConfirmOrder = async (customizedProduct) => {
         const user = auth.currentUser;
         if (!user || processing || !selectedTable) return;
+        
         setProductToCustomize(null); 
         setProcessing(true);
 
-        // 👇 ADRES GÜNCELLENDİ: 'shops/CURRENT_SHOP_ID/tables'
         const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id);
         
         try {
             const currentTable = tables.find(t => t.id === selectedTable.id);
             if (!currentTable) return;
 
-            const orderId = customizedProduct.id + '-' + Date.now(); 
+            const qty = customizedProduct.quantity || 1;
+            const unitPrice = customizedProduct.price; // Birim fiyat (Opsiyonlar dahil)
             
-            const newOrder = {
-                id: orderId,
-                productId: customizedProduct.id, 
-                name: customizedProduct.name, 
-                price: customizedProduct.price, 
-                quantity: customizedProduct.quantity
-            };
+            // Mevcut siparişleri kopyala
+            let newOrders = [...currentTable.orders];
+            let found = false;
 
-            const newTotal = currentTable.total + (newOrder.price * newOrder.quantity);
-            let newOrders = [...currentTable.orders, newOrder];
+            // 1. AYNI ÜRÜN VAR MI KONTROL ET (İsim ve Fiyat aynıysa birleştir)
+            // Eğer "Latte" ve "Latte (Soya)" varsa isimleri farklı olduğu için birleşmez. Doğrusu budur.
+            // Ama "Çay" ve "Çay" varsa birleşir.
+            newOrders = newOrders.map(order => {
+                if (order.name === customizedProduct.name && order.price === unitPrice && !order.isServed) {
+                    found = true;
+                    return { ...order, quantity: order.quantity + qty };
+                }
+                return order;
+            });
+
+            // 2. YOKSA YENİ EKLE
+            if (!found) {
+                const orderId = customizedProduct.id + '-' + Date.now(); 
+                newOrders.push({
+                    id: orderId,
+                    productId: customizedProduct.id, 
+                    name: customizedProduct.name, 
+                    price: unitPrice, 
+                    quantity: qty
+                });
+            }
+
+            // Toplam Tutarı Güncelle (Eski toplam + (Birim Fiyat * Eklenen Adet))
+            const newTotal = currentTable.total + (unitPrice * qty);
             
             await updateDoc(tableRef, { 
                 orders: newOrders, 
@@ -120,16 +174,13 @@ const Tables = ({ tables, products, userRole }) => {
             setProcessing(false); 
         }
     };
+    // -----------------------------------------------------------
 
-    // --- SİPARİŞ SİLME (ORTAK HAVUZDAN) ---
     const handleRemoveOrder = async (tableId, orderId, price) => {
         const user = auth.currentUser;
         if (!user || processing) return;
         setProcessing(true);
-        
-        // 👇 ADRES GÜNCELLENDİ
         const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', tableId);
-        
         try {
             const currentTable = tables.find(t => t.id === tableId);
             if (!currentTable) return;
@@ -138,8 +189,9 @@ const Tables = ({ tables, products, userRole }) => {
             if (existingOrderIndex === -1) return;
             
             let newOrders = [...currentTable.orders];
-            const newTotal = currentTable.total - price; 
+            const newTotal = currentTable.total - price; // 1 adet fiyatını düş
             
+            // Adet 1'den büyükse azalt, 1 ise sil
             if (newOrders[existingOrderIndex].quantity > 1) {
                 newOrders[existingOrderIndex].quantity -= 1;
             } else {
@@ -151,18 +203,13 @@ const Tables = ({ tables, products, userRole }) => {
         } catch (error) { console.error(error); } finally { setProcessing(false); }
     };
     
-    // --- MASAYI BOŞALT (ORTAK HAVUZ) ---
     const confirmMarkAsEmpty = async () => {
         if (!selectedTable) return;
-        
-        // 👇 ADRES GÜNCELLENDİ
         await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), { status: 'empty', orders: [], total: 0 });
-        
         setSelectedTable(prev => ({...prev, status: 'empty', orders: [], total: 0}));
         setIsEmptyConfirmOpen(false);
     };
 
-    // --- MASA KAPATMA & ÖDEME ALMA (EN ÖNEMLİ KISIM) ---
     const confirmCloseTable = async () => { 
         if (!selectedTable) return;
         setProcessing(true);
@@ -172,21 +219,11 @@ const Tables = ({ tables, products, userRole }) => {
             const transCardBank = paymentMethod === 'card' ? cardBank : null;
             const subMethodDisplay = paymentMethod === 'cash' ? 'Nakit' : `Kart (${cardBank.toUpperCase()})`;
 
-            // 1. İŞLEMİ ORTAK KASAYA EKLE (Patron ve Kasiyer görsün)
-            // 👇 ADRES GÜNCELLENDİ: 'shops/CURRENT_SHOP_ID/transactions'
             await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), {
-                date: new Date().toISOString().split('T')[0], 
-                type: 'income', 
-                amount: selectedTable.total,
-                desc: `${selectedTable.name} (${selectedTable.zone}) Satışı`, 
-                method: transMethod, 
-                cardBank: transCardBank, 
-                category: 'Masa Satışı', 
-                subMethod: subMethodDisplay 
+                date: new Date().toISOString().split('T')[0], type: 'income', amount: selectedTable.total,
+                desc: `${selectedTable.name} (${selectedTable.zone}) Satışı`, method: transMethod, cardBank: transCardBank, category: 'Masa Satışı', subMethod: subMethodDisplay 
             });
 
-            // 2. MASAYI ORTAK ALANDA SIFIRLA
-            // 👇 ADRES GÜNCELLENDİ
             await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), { orders: [], total: 0, status: 'needs_cleaning' });
             
             setIsCloseModalOpen(false);
@@ -196,16 +233,13 @@ const Tables = ({ tables, products, userRole }) => {
         } catch (error) { console.error(error); alert("Hata oluştu."); } finally { setProcessing(false); }
     };
 
-    // --- MASA TRANSFERİ (ORTAK HAVUZ) ---
     const handleTransfer = async (fromTableId, toTableId) => {
         setProcessing(true);
         const batch = writeBatch(db);
         const fromTable = tables.find(t => t.id === fromTableId);
         try {
-            // 👇 ADRESLER GÜNCELLENDİ
             batch.update(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', fromTableId), { orders: [], total: 0, status: 'empty' });
             batch.update(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', toTableId), { orders: fromTable.orders, total: fromTable.total, status: 'occupied' });
-            
             await batch.commit();
             setIsTransferModalOpen(false);
             setSelectedTable(null);
@@ -229,19 +263,48 @@ const Tables = ({ tables, products, userRole }) => {
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] overflow-hidden relative">
             
-            {/* MODALLAR */}
             <TableTransferModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} tables={tables} selectedTableId={selectedTable?.id} onConfirm={handleTransfer} loading={processing}/>
             <ConfirmationModal isOpen={isEmptyConfirmOpen} onClose={() => setIsEmptyConfirmOpen(false)} onConfirm={confirmMarkAsEmpty} title="Masayı Temizle" message="Bu masayı boş ve temiz olarak işaretlemek istediğinize emin misiniz? (Siparişler silinir)" type="warning" confirmText="TEMİZLE"/>
             <TableCloseModal isOpen={isCloseModalOpen} onClose={() => setIsCloseModalOpen(false)} onConfirm={confirmCloseTable} tableName={selectedTable?.name} amount={selectedTable?.total} method={paymentMethod} bank={cardBank} loading={processing}/>
-            
-            <ProductOptionsModal 
-                isOpen={!!productToCustomize} 
-                onClose={() => setProductToCustomize(null)} 
-                product={productToCustomize} 
-                onConfirm={handleConfirmOrder}
-            />
+            <ProductOptionsModal isOpen={!!productToCustomize} onClose={() => setProductToCustomize(null)} product={productToCustomize} onConfirm={handleConfirmOrder}/>
 
-            {/* SOL KISIM: MASA LİSTESİ */}
+            {isRezModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+                    <div className="bg-slate-900 w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+                            <h3 className="font-bold text-white flex items-center gap-2"><CalendarClock className="text-purple-400"/> Rezervasyon Oluştur</h3>
+                            <button onClick={() => setIsRezModalOpen(false)} className="text-slate-400 hover:text-white"><X size={20}/></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Müşteri Adı</label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+                                    <input type="text" value={rezForm.name} onChange={e => setRezForm({...rezForm, name: e.target.value})} placeholder="Örn: Ahmet Yılmaz" className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-purple-500"/>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Rezervasyon Saati</label>
+                                <div className="relative">
+                                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+                                    <input type="time" value={rezForm.time} onChange={e => setRezForm({...rezForm, time: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-purple-500"/>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Not (Opsiyonel)</label>
+                                <div className="relative">
+                                    <FileText className="absolute left-3 top-3 text-slate-500" size={18}/>
+                                    <textarea rows="2" value={rezForm.note} onChange={e => setRezForm({...rezForm, note: e.target.value})} placeholder="Örn: 4 Kişi, Doğum günü..." className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-purple-500 resize-none"/>
+                                </div>
+                            </div>
+                            <button onClick={handleSaveReservation} disabled={processing} className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-900/20 active:scale-95 transition-all">
+                                {processing ? 'Kaydediliyor...' : 'Rezervasyonu Kaydet'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className={`flex-1 overflow-y-auto p-4 md:p-8 ${selectedTable ? 'hidden md:block' : 'block'}`}>
                 <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3"><TableIcon size={28}/> Masalar</h2>
                 <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-800 pb-4">
@@ -254,82 +317,123 @@ const Tables = ({ tables, products, userRole }) => {
                             <span className="absolute top-2 left-3 text-xs opacity-70">No: {table.number}</span>
                             <span className="text-lg font-semibold">{table.name}</span>
                             <span className="text-xs opacity-80 mt-1 font-bold">{getTableStatusLabel(table.status)}</span>
+                            {table.status === 'reserved' && table.reservation && (
+                                <div className="absolute top-2 right-2 bg-black/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                                    <Clock size={10}/> {table.reservation.time}
+                                </div>
+                            )}
                             {table.total > 0 && <span className="absolute bottom-3 text-xl font-bold">{formatCurrency(table.total)} ₺</span>}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* SAĞ KISIM: DETAY VE İŞLEM */}
             {selectedTable ? (
                 <div className={`${THEME.card} w-full md:w-[420px] shrink-0 border-l ${THEME.border} flex flex-col absolute md:static inset-0 z-20`}>
                     <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
-                        <h3 className="text-xl font-bold text-white">{selectedTable.name}</h3>
+                        <div>
+                            <h3 className="text-xl font-bold text-white">{selectedTable.name}</h3>
+                            {selectedTable.status === 'reserved' && <span className="text-xs text-purple-400 font-bold flex items-center gap-1"><CalendarClock size={12}/> {selectedTable.reservation?.customerName} ({selectedTable.reservation?.time})</span>}
+                        </div>
                         <button onClick={() => setSelectedTable(null)} className="text-slate-400 hover:text-white p-2 rounded-full bg-slate-800"><X size={20}/></button>
                     </div>
-                    <div className="p-4 flex gap-2 border-b border-slate-800 shrink-0">
-                        <button onClick={() => setIsTransferModalOpen(true)} disabled={selectedTable.status === 'empty' || selectedTable.status === 'needs_cleaning'} className="flex-1 py-2 bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 rounded-lg text-xs font-bold border border-purple-500/20 flex items-center justify-center gap-2 disabled:opacity-50"><Move size={14}/> Taşı</button>
-                        <button onClick={() => setIsEmptyConfirmOpen(true)} disabled={selectedTable.status === 'empty'} className="flex-1 py-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 rounded-lg text-xs font-bold border border-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"><CheckCircle2 size={14}/> Temizle & Boşalt</button>
-                    </div>
-                    <div className="p-4 border-b border-slate-800 overflow-x-auto no-scrollbar flex gap-2 shrink-0">
-                        <button onClick={() => setSelectedCategory('Tümü')} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-colors ${selectedCategory === 'Tümü' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Tümü</button>
-                        {categories.map(cat => ( <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-colors ${selectedCategory === cat ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{cat}</button> ))}
-                    </div>
-                    
-                    {/* ÜRÜN SEÇİMİ */}
-                    <div className="grid grid-cols-2 gap-3 p-4 border-b border-slate-800 overflow-y-auto shrink-0 max-h-52 custom-scrollbar">
-                        {availableProducts.map(product => (
-                            <button key={product.id} onClick={() => handleProductClick(product)} className="p-3 bg-slate-800 border border-slate-700 rounded-xl hover:bg-slate-700 transition-colors active:scale-[0.98] flex flex-col items-start">
-                                <span className="text-sm font-semibold text-white truncate w-full text-left">{product.name}</span>
-                                <span className="text-xs text-indigo-400 font-bold mt-1">{formatCurrency(product.price)} ₺</span>
-                            </button>
-                        ))}
+
+                    <div className="p-4 flex gap-2 border-b border-slate-800 shrink-0 overflow-x-auto">
+                        {selectedTable.status === 'empty' && (
+                            <button onClick={() => setIsRezModalOpen(true)} className="flex-1 py-2 bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 rounded-lg text-xs font-bold border border-purple-500/20 flex items-center justify-center gap-2 whitespace-nowrap"><CalendarClock size={14}/> Rezerve Et</button>
+                        )}
+                        {selectedTable.status === 'reserved' && (
+                            <>
+                                <button onClick={handleCustomerArrived} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 whitespace-nowrap shadow-lg shadow-emerald-900/20"><CheckCircle2 size={14}/> Müşteri Geldi</button>
+                                <button onClick={handleCancelReservation} className="px-3 py-2 bg-red-900/20 hover:bg-red-900/30 text-red-400 rounded-lg text-xs font-bold border border-red-500/20 whitespace-nowrap">İptal</button>
+                            </>
+                        )}
+                        <button onClick={() => setIsTransferModalOpen(true)} disabled={selectedTable.status === 'empty' || selectedTable.status === 'reserved' || selectedTable.status === 'needs_cleaning'} className="px-3 py-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 rounded-lg text-xs font-bold border border-blue-500/20 disabled:opacity-50 disabled:hidden"><Move size={14}/> Taşı</button>
+                        <button onClick={() => setIsEmptyConfirmOpen(true)} disabled={selectedTable.status === 'empty' || selectedTable.status === 'reserved'} className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-bold border border-slate-600 disabled:opacity-50 disabled:hidden"><Trash2 size={14}/> Boşalt</button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                        {selectedTable.orders.length > 0 ? ( selectedTable.orders.map(order => (
-                                <div key={order.id} className="flex justify-between items-center p-2 bg-slate-900/50 rounded-lg border border-slate-800">
-                                    <div className="flex-1 min-w-0 pr-2">
-                                        <span className="text-sm font-medium block truncate">{order.name}</span>
-                                        <span className="text-xs text-slate-500 block">x{order.quantity}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <span className="font-bold text-sm text-indigo-400">{formatCurrency(order.price * order.quantity)} ₺</span>
-                                        <button onClick={() => handleRemoveOrder(selectedTable.id, order.id, order.price)} className="text-red-500 hover:text-red-400 p-1 rounded-full hover:bg-slate-800"><Trash2 size={16}/></button>
-                                    </div>
-                                </div>
-                            ))
-                        ) : <div className="text-center py-10 text-slate-600"><Coffee size={32} className="mx-auto mb-2"/><p>Bu masada sipariş yok.</p></div>}
-                    </div>
-                    
-                    {/* ÖDEME KISMI */}
-                    <div className="p-5 bg-slate-900 border-t border-slate-800">
-                        <div className="flex justify-between items-end mb-4"><span className="text-slate-400 text-sm mb-1 block">Toplam Tutar</span><span className="text-4xl font-extrabold text-white tracking-tight">{formatCurrency(selectedTable.total)} <span className="text-lg text-slate-500 font-normal">₺</span></span></div>
-                        
-                        {userRole !== 'garson' ? (
-                            <>
-                                <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <button onClick={() => setPaymentMethod('cash')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'cash' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Banknote size={24}/> <span className="text-xs">NAKİT</span></button>
-                                    <button onClick={() => setPaymentMethod('card')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'card' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><CreditCard size={24}/> <span className="text-xs">KART / BANKA</span></button>
-                                </div>
-                                {paymentMethod === 'card' && (
-                                    <div className="grid grid-cols-3 gap-2 mb-3 animate-in fade-in slide-in-from-top-2">{bankOptions.map(option => ( <button key={option.key} onClick={() => setCardBank(option.key)} className={`py-2 rounded-lg text-xs font-bold transition-colors ${cardBank === option.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{option.label}</button> ))}</div>
+                    {selectedTable.status === 'reserved' ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-50">
+                            <CalendarClock size={48} className="text-purple-500 mb-4"/>
+                            <h3 className="text-xl font-bold text-white mb-2">Masa Rezerve</h3>
+                            <p className="text-slate-400 text-sm">Sipariş girebilmek için müşterinin gelmesi ve masanın açılması gerekmektedir.</p>
+                            <div className="mt-6 bg-slate-800 p-4 rounded-xl border border-slate-700 w-full text-left">
+                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Müşteri</p>
+                                <p className="text-white font-bold mb-3">{selectedTable.reservation?.customerName}</p>
+                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Saat</p>
+                                <p className="text-white font-bold mb-3">{selectedTable.reservation?.time}</p>
+                                {selectedTable.reservation?.note && (
+                                    <>
+                                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">Not</p>
+                                        <p className="text-slate-300 text-sm italic">"{selectedTable.reservation?.note}"</p>
+                                    </>
                                 )}
-                                <button onClick={handlePrintBill} disabled={selectedTable.total <= 0} className="w-full mb-3 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
-                                <button onClick={() => setIsCloseModalOpen(true)} disabled={selectedTable.total <= 0 || processing} className={`w-full py-4 rounded-xl font-bold text-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${paymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/30' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/30'} text-white flex items-center justify-center gap-2`}><CheckCircle2 size={20}/> {formatCurrency(selectedTable.total)} ₺ KAPAT</button>
-                            </>
-                        ) : (
-                            <div className="space-y-3 animate-in fade-in">
-                                <div className="p-3 bg-rose-900/20 border border-rose-500/30 rounded-xl text-center flex flex-col items-center gap-1">
-                                    <AlertTriangle size={20} className="text-rose-400 mb-1"/>
-                                    <p className="text-xs text-rose-400 font-bold">Ödeme Alma Yetkiniz Yok</p>
-                                    <p className="text-[10px] text-slate-500">Lütfen ödeme işlemleri için kasayı çağırın.</p>
-                                </div>
-                                <button onClick={handlePrintBill} disabled={selectedTable.total <= 0} className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
                             </div>
-                        )}
-                    </div>
-                    <Receipt data={printData} />
+                        </div>
+                    ) : (
+                        <>
+                            <div className="p-4 border-b border-slate-800 overflow-x-auto no-scrollbar flex gap-2 shrink-0">
+                                <button onClick={() => setSelectedCategory('Tümü')} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-colors ${selectedCategory === 'Tümü' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Tümü</button>
+                                {categories.map(cat => ( <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-colors ${selectedCategory === cat ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{cat}</button> ))}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3 p-4 border-b border-slate-800 overflow-y-auto shrink-0 max-h-52 custom-scrollbar">
+                                {availableProducts.map(product => (
+                                    <button key={product.id} onClick={() => handleProductClick(product)} className="p-3 bg-slate-800 border border-slate-700 rounded-xl hover:bg-slate-700 transition-colors active:scale-[0.98] flex flex-col items-start relative group">
+                                        <span className="text-sm font-semibold text-white truncate w-full text-left">{product.name}</span>
+                                        <span className="text-xs text-indigo-400 font-bold mt-1">{formatCurrency(product.price)} ₺</span>
+                                        {product.options && product.options.length > 0 && (
+                                            <span className="absolute top-2 right-2 w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                {selectedTable.orders.length > 0 ? ( selectedTable.orders.map(order => (
+                                        <div key={order.id} className="flex justify-between items-center p-2 bg-slate-900/50 rounded-lg border border-slate-800">
+                                            <div className="flex-1 min-w-0 pr-2">
+                                                <span className="text-sm font-medium block truncate" title={order.name}>{order.name}</span>
+                                                <span className="text-xs text-slate-500 block">x{order.quantity}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="font-bold text-sm text-indigo-400">{formatCurrency(order.price * order.quantity)} ₺</span>
+                                                <button onClick={() => handleRemoveOrder(selectedTable.id, order.id, order.price)} className="text-red-500 hover:text-red-400 p-1 rounded-full hover:bg-slate-800"><Trash2 size={16}/></button>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : <div className="text-center py-10 text-slate-600"><Coffee size={32} className="mx-auto mb-2"/><p>Bu masada sipariş yok.</p></div>}
+                            </div>
+                            
+                            <div className="p-5 bg-slate-900 border-t border-slate-800">
+                                <div className="flex justify-between items-end mb-4"><span className="text-slate-400 text-sm mb-1 block">Toplam Tutar</span><span className="text-4xl font-extrabold text-white tracking-tight">{formatCurrency(selectedTable.total)} <span className="text-lg text-slate-500 font-normal">₺</span></span></div>
+                                
+                                {userRole !== 'garson' ? (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-3 mb-3">
+                                            <button onClick={() => setPaymentMethod('cash')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'cash' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Banknote size={24}/> <span className="text-xs">NAKİT</span></button>
+                                            <button onClick={() => setPaymentMethod('card')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-colors ${paymentMethod === 'card' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><CreditCard size={24}/> <span className="text-xs">KART / BANKA</span></button>
+                                        </div>
+                                        {paymentMethod === 'card' && (
+                                            <div className="grid grid-cols-3 gap-2 mb-3 animate-in fade-in slide-in-from-top-2">{bankOptions.map(option => ( <button key={option.key} onClick={() => setCardBank(option.key)} className={`py-2 rounded-lg text-xs font-bold transition-colors ${cardBank === option.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{option.label}</button> ))}</div>
+                                        )}
+                                        <button onClick={handlePrintBill} disabled={selectedTable.total <= 0} className="w-full mb-3 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
+                                        <button onClick={() => setIsCloseModalOpen(true)} disabled={selectedTable.total <= 0 || processing} className={`w-full py-4 rounded-xl font-bold text-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${paymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/30' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/30'} text-white flex items-center justify-center gap-2`}><CheckCircle2 size={20}/> {formatCurrency(selectedTable.total)} ₺ KAPAT</button>
+                                    </>
+                                ) : (
+                                    <div className="space-y-3 animate-in fade-in">
+                                        <div className="p-3 bg-rose-900/20 border border-rose-500/30 rounded-xl text-center flex flex-col items-center gap-1">
+                                            <AlertTriangle size={20} className="text-rose-400 mb-1"/>
+                                            <p className="text-xs text-rose-400 font-bold">Ödeme Alma Yetkiniz Yok</p>
+                                            <p className="text-[10px] text-slate-500">Lütfen ödeme işlemleri için kasayı çağırın.</p>
+                                        </div>
+                                        <button onClick={handlePrintBill} disabled={selectedTable.total <= 0} className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
+                                    </div>
+                                )}
+                            </div>
+                            <Receipt data={printData} />
+                        </>
+                    )}
                 </div>
             ) : (
                 <div className="hidden md:flex w-full md:w-96 shrink-0 border-l border-slate-800 flex-col items-center justify-center text-slate-600 bg-slate-900/30">

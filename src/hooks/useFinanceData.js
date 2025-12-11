@@ -1,9 +1,9 @@
-// src/hooks/useFinanceData.js (DEBUG MODU VE SIRALAMA KALDIRILDI)
+// src/hooks/useFinanceData.js (KATEGORİ YÖNETİMİ ENTEGRE EDİLDİ ✅)
 
 import { useState, useEffect, useMemo, useRef } from 'react'; 
-import { collection, doc, onSnapshot, query, limit, writeBatch } from 'firebase/firestore'; // orderBy kaldırıldı
+import { collection, doc, onSnapshot, query, limit, writeBatch, setDoc } from 'firebase/firestore'; 
 import { db, appId } from '../services/firebase';
-import { INITIAL_TABLES } from '../utils/constants'; 
+import { INITIAL_TABLES, CATEGORIES as DEFAULT_CATEGORIES } from '../utils/constants'; 
 
 // 👇 MAĞAZA KİMLİĞİ
 const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
@@ -18,6 +18,9 @@ export default function useFinanceData(user) {
   const [tables, setTables] = useState([]);
   const [staff, setStaff] = useState([]); 
   
+  // 👇 YENİ: KATEGORİLER STATE'İ
+  const [categories, setCategories] = useState([]);
+
   const [fixedCosts, setFixedCosts] = useState({ rent: 0, staff: 0, bills: 0, other: 0 });
   const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [marketRates, setMarketRates] = useState({ gold: 0, dollar: 0, euro: 0 });
@@ -42,40 +45,53 @@ export default function useFinanceData(user) {
   useEffect(() => {
     if (!user) return; 
     
-    // 👇 KONSOLA LOG BASIYORUZ: Hangi yola bağlanıyor?
     console.log("🔥 Bağlanılan Mağaza Yolu:", `artifacts/${appId}/shops/${CURRENT_SHOP_ID}`);
 
     const unsubscribers = []; 
     setLoading(true);
 
     try {
-      // 1. MASALAR
+      // 1. KATEGORİLERİ ÇEK (Eğer yoksa varsayılanları oluştur)
+      unsubscribers.push(onSnapshot(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'categories'), (docSnap) => {
+          if (docSnap.exists()) {
+              // Veritabanında varsa oradan al
+              setCategories(docSnap.data().list || []);
+          } else {
+              // Yoksa (ilk kurulum), constants dosyasındaki varsayılanları veritabanına yaz
+              const initialCats = DEFAULT_CATEGORIES.map((name, index) => ({
+                  id: `cat-${index}`,
+                  name: name
+              }));
+              setDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'categories'), { list: initialCats });
+              setCategories(initialCats);
+          }
+      }, (error) => console.error("Kategori okuma hatası:", error)));
+
+      // 2. MASALAR
       unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables'), (s) => {
         const tableData = s.docs.map(d => ({id:d.id, ...d.data()}));
-        setTables(tableData.sort((a,b) => a.number - b.number)); // JS ile sıralama
+        setTables(tableData.sort((a,b) => a.number - b.number)); 
         if (tableData.length === 0 && !hasSeededTablesRef.current) { autoSeedTables(); }
         if (tableData.length > 0) setLoading(false); 
       }, (error) => console.error("❌ MASA OKUMA HATASI:", error)));
 
-      // 2. PERSONEL
+      // 3. PERSONEL
       unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'staff'), (s) => {
           setStaff(s.docs.map(d => ({id:d.id, ...d.data()})));
       }, (error) => console.error("❌ PERSONEL OKUMA HATASI:", error)));
 
-      // 3. FİNANS VE İŞLEMLER
+      // 4. FİNANS VE İŞLEMLER
       unsubscribers.push(onSnapshot(query(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), limit(500)), (s) => {
           setTransactions(s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => b.date.localeCompare(a.date)));
       }, (error) => console.error("❌ İŞLEM OKUMA HATASI:", error)));
       
-      // 👇 4. ÜRÜNLER (SORUNLU KISIM BURASIYDI)
-      // orderBy('name') komutunu kaldırdık, belki index hatası veriyordur.
+      // 5. ÜRÜNLER
       unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'products'), (s) => {
           const prodData = s.docs.map(d => ({id:d.id, ...d.data()}));
-          console.log("✅ ÜRÜNLER GELDİ:", prodData); // Gelen veriyi konsola yazar
-          setProducts(prodData.sort((a,b) => a.name.localeCompare(b.name))); // JS ile sıralama
+          // Ürünleri 'order' alanına göre sırala (Sürükle-bırak için önemli)
+          setProducts(prodData.sort((a,b) => (a.order || 9999) - (b.order || 9999))); 
       }, (error) => {
-          console.error("❌ ÜRÜN OKUMA HATASI:", error); // Hata varsa konsolda kırmızı yazar
-          console.log("Hata Detayı:", error.message);
+          console.error("❌ ÜRÜN OKUMA HATASI:", error);
       }));
       
       unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'investments'), s => setInvestments(s.docs.map(d => ({id:d.id, ...d.data()})))));
@@ -83,7 +99,7 @@ export default function useFinanceData(user) {
       unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'ingredients'), s => setIngredients(s.docs.map(d => ({id:d.id, ...d.data()})))));
       unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'quickActions'), s => setQuickActions(s.docs.map(d => ({id:d.id, ...d.data()})))));
 
-      // 5. AYARLAR
+      // 6. AYARLAR
       unsubscribers.push(onSnapshot(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'fixedCosts'), (doc) => { if(doc.exists()) setFixedCosts(doc.data()); }));
       unsubscribers.push(onSnapshot(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'settings', 'monthlyGoal'), (doc) => { if(doc.exists()) setMonthlyGoal(doc.data().value); }));
 
@@ -99,14 +115,10 @@ export default function useFinanceData(user) {
   useEffect(() => {
         const fetchRates = async () => {
             try {
-                // API isteği
                 const response = await fetch('https://api.genelpara.com/embed/altin.json');
-                
-                // Eğer sunucu hata verirse veya HTML dönerse (Sizin aldığınız hata)
                 if (!response.ok) throw new Error("Sunucu yanıt vermedi");
                 
                 const text = await response.text();
-                // Gelen veri JSON formatında mı kontrol et
                 if (!text.startsWith('{')) throw new Error("API JSON döndürmedi");
 
                 const data = JSON.parse(text);
@@ -117,7 +129,6 @@ export default function useFinanceData(user) {
                 });
             } catch (error) { 
                 console.warn("⚠️ Döviz verisi çekilemedi, varsayılan değerler kullanılıyor.", error.message);
-                // Hata olursa uygulama çökmesin, bu değerleri kullan:
                 setMarketRates({ gold: 2950, dollar: 34.50, euro: 37.20 });
             }
         };
@@ -205,6 +216,7 @@ export default function useFinanceData(user) {
   return {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     staff, 
+    categories, // 👈 DIŞARI AKTARILAN KATEGORİ LİSTESİ
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings, loading
   };

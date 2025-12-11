@@ -1,13 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { Wrench, Clock, AlertCircle, CheckCircle2, Coffee } from 'lucide-react';
+import { Wrench, Clock, AlertCircle, Coffee } from 'lucide-react';
 
 const MaintenancePage = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsedTime(prev => prev + 1);
-    }, 1000);
+    // 1. Bakım başlangıç zamanı hafızada var mı kontrol et
+    const STORAGE_KEY = 'motto_maintenance_start_time';
+    let storedStartTime = localStorage.getItem(STORAGE_KEY);
+
+    if (!storedStartTime) {
+      // Yoksa şu anki zamanı başlangıç olarak ayarla ve kaydet
+      storedStartTime = Date.now();
+      localStorage.setItem(STORAGE_KEY, storedStartTime);
+    }
+
+    // 2. Geçen süreyi hesaplayan fonksiyon
+    const calculateElapsedTime = () => {
+      const now = Date.now();
+      // Farkı milisaniyeden saniyeye çeviriyoruz
+      const diffInSeconds = Math.floor((now - parseInt(storedStartTime)) / 1000);
+      setElapsedTime(diffInSeconds);
+    };
+
+    // İlk açılışta hemen hesapla (1 saniye beklememek için)
+    calculateElapsedTime();
+
+    // Her saniye güncelle
+    const timer = setInterval(calculateElapsedTime, 1000);
+
     return () => clearInterval(timer);
   }, []);
 
@@ -15,7 +36,13 @@ const MaintenancePage = () => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${hours}h ${minutes}m ${secs}s`;
+    
+    // Tek haneli sayıların önüne 0 ekleyelim (01:05:09 gibi görünmesi için)
+    const h = hours > 0 ? `${hours}h ` : '';
+    const m = minutes < 10 ? `0${minutes}` : minutes;
+    const s = secs < 10 ? `0${secs}` : secs;
+    
+    return `${h}${m}m ${s}s`;
   };
 
   return (
@@ -66,7 +93,7 @@ const MaintenancePage = () => {
           <div className="bg-gradient-to-r from-indigo-600/10 to-purple-600/10 border border-indigo-500/20 rounded-xl p-4 mb-8">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="text-indigo-400" size={18} />
-              <p className="text-xs text-slate-400 font-semibold uppercase">Bakım süresi</p>
+              <p className="text-xs text-slate-400 font-semibold uppercase">Geçen Süre</p>
             </div>
             <p className="text-2xl font-bold text-indigo-300 font-mono">
               {formatTime(elapsedTime)}
@@ -105,7 +132,7 @@ const MaintenancePage = () => {
 
         {/* Decorative element */}
         <div className="mt-6 text-center">
-          <p className="text-slate-600 text-xs">v0.0.0</p>
+          <p className="text-slate-600 text-xs">v1.0.2-maintenance</p>
         </div>
       </div>
     </div>
