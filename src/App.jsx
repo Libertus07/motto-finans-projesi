@@ -14,7 +14,7 @@ import InfoModal from './components/InfoModal';
 import MaintenancePage from './components/MaintenancePage';
 
 // 👇 BAKIM MODU AYARI
-const MAINTENANCE_MODE = false;
+const MAINTENANCE_MODE = true;
 
 // Sayfalar dinamik yukleniyor (Lazy Loading)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
