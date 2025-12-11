@@ -1,4 +1,4 @@
-// hooks/useFinanceData.js (DÜZELTİLMİŞ VE UYUMLU VERSİYON)
+// src/hooks/useFinanceData.js (PERSONEL VERİSİ EKLENDİ ✅)
 
 import { useState, useEffect, useMemo, useRef } from 'react'; 
 import { collection, doc, onSnapshot, query, orderBy, limit, writeBatch } from 'firebase/firestore'; 
@@ -6,7 +6,7 @@ import { db, appId } from '../services/firebase';
 import { INITIAL_TABLES } from '../utils/constants'; 
 
 export default function useFinanceData(user) {
-  // Data States
+  // State Tanımları
   const [transactions, setTransactions] = useState([]);
   const [products, setProducts] = useState([]);
   const [investments, setInvestments] = useState([]);
@@ -15,6 +15,9 @@ export default function useFinanceData(user) {
   const [quickActions, setQuickActions] = useState([]);
   const [tables, setTables] = useState([]);
   
+  // 👇 EKSİK OLAN KISIM: Personel State'i
+  const [staff, setStaff] = useState([]); 
+  
   const [fixedCosts, setFixedCosts] = useState({ rent: 0, staff: 0, bills: 0, other: 0 });
   const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [marketRates, setMarketRates] = useState({ gold: 0, dollar: 0, euro: 0 });
@@ -22,28 +25,20 @@ export default function useFinanceData(user) {
   
   const hasSeededTablesRef = useRef(false);
 
-  // --- KRİTİK FONKSİYON: Masaları Oluşturma ---
   const autoSeedTables = (userId) => {
       if (!userId || hasSeededTablesRef.current) return;
-      
       const batch = writeBatch(db);
-      
       if (INITIAL_TABLES && INITIAL_TABLES.length > 0) {
           INITIAL_TABLES.forEach(t => {
               batch.set(doc(db, 'artifacts', appId, 'users', userId, 'tables', t.id), t);
           });
       }
-      
-      // 1. ANINDA YEREL GÜNCELLEME (Gecikmeyi Engeller)
       setTables(INITIAL_TABLES); 
       setLoading(false); 
       hasSeededTablesRef.current = true; 
-
-      // 2. FIREBASE'E YAZMA (ARKA PLANDA)
       batch.commit().catch(e => console.error("Masa oluşturma hatası:", e));
   };
 
-  // --- 1. VERİ ÇEKME ---
   useEffect(() => {
     if (!user || !user.uid) return; 
     
@@ -52,19 +47,18 @@ export default function useFinanceData(user) {
     setLoading(true);
 
     try {
-      // Masalar Listener
+      // Masalar
       unsubscribers.push(onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'tables'), orderBy('number', 'asc')), s => {
         const tableData = s.docs.map(d => ({id:d.id, ...d.data()}));
         setTables(tableData);
-        
-        // Eğer masalar boşsa ve daha önce denenmediyse oluştur
-        if (tableData.length === 0 && !hasSeededTablesRef.current) {
-            autoSeedTables(uid);
-        }
+        if (tableData.length === 0 && !hasSeededTablesRef.current) { autoSeedTables(uid); }
         if (tableData.length > 0) setLoading(false); 
       }));
 
-      // Diğer Listener'lar
+      // 👇 EKSİK OLAN KISIM: Personel Verisini Çekme Kodu
+      unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'users', uid, 'staff'), s => setStaff(s.docs.map(d => ({id:d.id, ...d.data()})))));
+
+      // Diğer Veriler
       unsubscribers.push(onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'transactions'), orderBy('date', 'desc'), limit(500)), s => setTransactions(s.docs.map(d => ({id:d.id, ...d.data()})))));
       unsubscribers.push(onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'products'), orderBy('name', 'asc')), s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))));
       unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'users', uid, 'investments'), s => setInvestments(s.docs.map(d => ({id:d.id, ...d.data()})))));
@@ -83,7 +77,6 @@ export default function useFinanceData(user) {
     return () => unsubscribers.forEach(unsub => unsub());
   }, [user]);
 
-  // --- 2. PİYASA VERİLERİ ---
   useEffect(() => {
         const fetchRates = async () => {
             try {
@@ -99,7 +92,6 @@ export default function useFinanceData(user) {
         fetchRates();
   }, []);
 
-  // --- 3. İSTATİSTİKLER ---
   const stats = useMemo(() => {
       const safeTransactions = Array.isArray(transactions) ? transactions : [];
       const safeDebts = Array.isArray(debts) ? debts : [];
@@ -158,17 +150,14 @@ export default function useFinanceData(user) {
       return { 
         totalIncome, totalExpense, netProfit, netNetProfit, totalMonthlyFixedCosts, 
         dailyIncome, monthlyIncome, monthlyExpense, breakdown, totalDebt, investmentStats, assets,
-        currentBalance: netProfit // Gelecek tahmini için eklendi
+        currentBalance: netProfit 
       };
   }, [transactions, debts, investments, fixedCosts]);
 
-  // --- 4. YARDIMCI FONKSİYONLAR ---
   const calculateFutureCashflow = (days = 30) => {
       const dailyAvgIncome = stats.monthlyIncome / 30; 
       const dailyAvgExpense = stats.monthlyExpense / 30;
       const dailyFixedCost = stats.totalMonthlyFixedCosts / 30;
-      
-      // Tahmini Bakiye (Number döndürür)
       return stats.currentBalance + ((dailyAvgIncome - dailyAvgExpense - dailyFixedCost) * days);
   };
 
@@ -183,6 +172,7 @@ export default function useFinanceData(user) {
   
   return {
     transactions, products, investments, debts, ingredients, quickActions, tables,
+    staff, // 👈 DIŞARI AKTARDIK
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings, loading
   };

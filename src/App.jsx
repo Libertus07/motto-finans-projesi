@@ -1,8 +1,8 @@
-// App.jsx (BAKIM MODU EKLENMİŞ VERSİYON)
+// src/App.jsx (PERSONEL VERİSİ BAĞLANDI VE OTURUM HATIRLAMA EKLENDİ)
 
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { Loader2, Menu, Coffee, Construction } from 'lucide-react'; // Construction ikonu eklendi
+import { Loader2, Menu, Coffee, Construction } from 'lucide-react'; 
 
 import { auth } from './services/firebase';
 import { THEME } from './utils/constants';
@@ -10,9 +10,10 @@ import { THEME } from './utils/constants';
 import Sidebar from './components/Sidebar';
 import AuthScreen from './components/AuthScreen';
 import useFinanceData from './hooks/useFinanceData';
+import InfoModal from './components/InfoModal';
 
-// 👇 BAKIM MODU AYARI (Açmak için true, kapatmak için false yapın)
-const MAINTENANCE_MODE = true;
+// 👇 BAKIM MODU AYARI
+const MAINTENANCE_MODE = false;
 
 // Sayfalar dinamik yukleniyor (Lazy Loading)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -29,6 +30,7 @@ const Tables = lazy(() => import('./pages/Tables'));
 const CashierSettings = lazy(() => import('./pages/CashierSettings'));
 const ZReport = lazy(() => import('./pages/ZReport'));
 const Inventory = lazy(() => import('./pages/Inventory'));
+const Staff = lazy(() => import('./pages/Staff'));
 
 export default function PatronFinancePro() {
   const [user, setUser] = useState(null);
@@ -37,21 +39,24 @@ export default function PatronFinancePro() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   
+  // Maaş Bildirimi
+  const [salaryNotification, setSalaryNotification] = useState({ isOpen: false, names: '' });
+
   // Verileri Hook'tan Çek
   const {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings,
+    staff, // 👈 PERSONEL VERİSİ ARTIK BURAYA GELİYOR
   } = useFinanceData(user); 
 
-  // Auth ve Yönlendirme
+  // --- OTURUM YÖNETİMİ ---
   useEffect(() => {
-    if (userRole === null) { setLoading(false); return; }
-    
-    // Yönlendirme Mantığı
-    if (userRole === 'kasiyer') setActiveTab('pos');
-    else if (userRole === 'garson') setActiveTab('tables'); 
-    else setActiveTab('dashboard'); 
+    // 1. Sayfa yenilendiğinde eski rolü hatırla
+    const savedRole = localStorage.getItem('motto_user_role');
+    if (savedRole) {
+        setUserRole(savedRole);
+    }
 
     const initAuth = async () => { 
         try { await signInAnonymously(auth); } 
@@ -61,107 +66,69 @@ export default function PatronFinancePro() {
 
     return onAuthStateChanged(auth, (currentUser) => { 
         if (currentUser) {
-            localStorage.setItem('motto_anon_uid', currentUser.uid);
-        } else {
-             localStorage.removeItem('motto_anon_uid');
+            setUser(currentUser);
         }
-        setUser(currentUser); 
         setLoading(false); 
     });
+  }, []);
+
+  // 2. Rol değişince hafızaya kaydet
+  useEffect(() => {
+    if (userRole) {
+        localStorage.setItem('motto_user_role', userRole);
+        
+        // İlk açılış yönlendirmesi
+        if (activeTab === 'pos' && userRole === 'patron') setActiveTab('dashboard');
+        if (userRole === 'kasiyer') setActiveTab('pos');
+        if (userRole === 'garson') setActiveTab('tables');
+    }
   }, [userRole]);
+
+  // Maaş Bildirimi Kontrolü
+  useEffect(() => {
+    if (userRole === 'patron' && staff && staff.length > 0) {
+        const today = new Date().getDate();
+        const pendingPayments = staff.filter(p => Number(p.salaryDay) === today);
+        
+        if (pendingPayments.length > 0) {
+            const notificationKey = `salary_notified_${new Date().toDateString()}`;
+            if (!sessionStorage.getItem(notificationKey)) {
+                setSalaryNotification({ isOpen: true, names: pendingPayments.map(p => p.name).join(', ') });
+                sessionStorage.setItem(notificationKey, 'true');
+            }
+        }
+    }
+  }, [staff, userRole]);
   
-  // 👇 BAKIM MODU EKRANI
-  if (MAINTENANCE_MODE) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
-        <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl max-w-md w-full animate-in zoom-in duration-500">
-          <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Construction size={40} className="text-amber-500 animate-pulse" />
-          </div>
-          <h1 className="text-3xl font-black text-white mb-2">Sistem Bakımda</h1>
-          <p className="text-slate-400 mb-6">
-            Motto Coffee sistemi şu anda güncelleniyor. Daha iyi bir deneyim için kısa bir mola verdik.
-          </p>
-          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <p className="text-xs text-slate-500 font-mono">Status: System Upgrade in Progress...</p>
-            <div className="w-full bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
-              <div className="bg-amber-500 h-full w-2/3 animate-[shimmer_2s_infinite]"></div>
-            </div>
-          </div>
-          <p className="text-xs text-slate-600 mt-6">Lütfen daha sonra tekrar deneyiniz.</p>
-        </div>
-      </div>
-    );
-  }
+  if (MAINTENANCE_MODE) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Sistem Bakımda</div>;
 
   const renderContent = () => {
-    // Yetki Kontrolü
     if (userRole === 'kasiyer' || userRole === 'garson') {
-        const allowedTabs = userRole === 'garson' 
-            ? ['tables', 'products'] 
-            : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; 
-        
-        if (!allowedTabs.includes(activeTab)) {
-             return (
-                <div className="flex flex-col items-center justify-center h-[50vh] text-slate-500 space-y-4">
-                    <div className="p-4 bg-slate-800 rounded-full"><Coffee size={40} className="text-slate-600"/></div>
-                    <p>Bu alana erişim yetkiniz yok.</p>
-                    <button onClick={() => setActiveTab(userRole === 'garson' ? 'tables' : 'pos')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Ana Ekrana Dön</button>
-                </div>
-             );
-        }
+        const allowedTabs = userRole === 'garson' ? ['tables', 'products'] : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; 
+        if (!allowedTabs.includes(activeTab)) return <div className="text-center py-20 text-slate-500">Yetkisiz Alan</div>;
     }
 
     switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard stats={stats} transactions={transactions} monthlyGoal={monthlyGoal} calculateFutureCashflow={calculateFutureCashflow} getProfitabilityWarnings={() => getProfitabilityWarnings(products)} tables={tables}/>;
-      
-      case 'zreport':
-        return <ZReport transactions={transactions} />;
-      
-      case 'pos': 
-        return <CashierPOS products={products} ingredients={ingredients} />; 
-
-      case 'tables':
-        return <Tables tables={tables} products={products} ingredients={ingredients} userRole={userRole} />;
-
-      case 'transactions':
-        return <Transactions transactions={transactions} quickActions={quickActions} isPatron={userRole === 'patron'}/>;
-      
-      case 'debts':
-        return <Debts debts={debts} stats={stats} />;
-
-      case 'products':
-          return <Products products={products} isPatron={userRole === 'patron'} userRole={userRole} />;
-
-      case 'inventory': 
-          return <Inventory ingredients={ingredients} debts={debts} />;
-
-      case 'recipe':
-          return <Recipe ingredients={ingredients} products={products} />;
-          
-      case 'investments':
-          return <Investments investments={investments} marketRates={marketRates} />;
-      
-      case 'stats':
-          return <Stats transactions={transactions} products={products} />;
-
-      case 'assistant':
-          return <Assistant stats={stats} />;
-
-      case 'settings':
-          if (userRole === 'patron') {
-              return <Settings monthlyGoal={monthlyGoal} setMonthlyGoal={setMonthlyGoal} fixedCosts={fixedCosts} setFixedCosts={setFixedCosts} />;
-          }
-          return <CashierSettings />;
-
-      default:
-        return <div className="text-center py-20 text-slate-500">Sayfa Bulunamadi.</div>;
+      case 'dashboard': return <Dashboard stats={stats} transactions={transactions} monthlyGoal={monthlyGoal} calculateFutureCashflow={calculateFutureCashflow} getProfitabilityWarnings={() => getProfitabilityWarnings(products)} tables={tables}/>;
+      case 'zreport': return <ZReport transactions={transactions} />;
+      case 'pos': return <CashierPOS products={products} ingredients={ingredients} />; 
+      case 'tables': return <Tables tables={tables} products={products} ingredients={ingredients} userRole={userRole} />;
+      case 'transactions': return <Transactions transactions={transactions} quickActions={quickActions} isPatron={userRole === 'patron'}/>;
+      case 'debts': return <Debts debts={debts} stats={stats} />;
+      case 'products': return <Products products={products} isPatron={userRole === 'patron'} userRole={userRole} />;
+      case 'inventory': return <Inventory ingredients={ingredients} debts={debts} />;
+      case 'recipe': return <Recipe ingredients={ingredients} products={products} />;
+      case 'investments': return <Investments investments={investments} marketRates={marketRates} />;
+      case 'stats': return <Stats transactions={transactions} products={products} />;
+      case 'assistant': return <Assistant stats={stats} />;
+      case 'staff': return <Staff staff={staff} />;
+      case 'settings': return userRole === 'patron' ? <Settings monthlyGoal={monthlyGoal} setMonthlyGoal={setMonthlyGoal} fixedCosts={fixedCosts} setFixedCosts={setFixedCosts} /> : <CashierSettings />;
+      default: return <div className="text-center py-20 text-slate-500">Sayfa Bulunamadi.</div>;
     }
   };
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-indigo-500"><Loader2 className="animate-spin" size={40}/></div>;
-  if (userRole === null) return <AuthScreen setUserRole={setUserRole} />;
+  if (!userRole) return <AuthScreen setUserRole={setUserRole} />;
 
   return (
     <div className={`min-h-screen ${THEME.bg} text-slate-200 font-sans flex`}>
@@ -177,6 +144,8 @@ export default function PatronFinancePro() {
           </Suspense>
         </div>
       </main>
+
+      <InfoModal isOpen={salaryNotification.isOpen} onClose={() => setSalaryNotification({ ...salaryNotification, isOpen: false })} type="info" title="🔔 Maaş Günü Hatırlatması" message={`Bugün maaş günü:\n\n${salaryNotification.names}`} />
     </div>
   );
 }

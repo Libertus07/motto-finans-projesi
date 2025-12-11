@@ -1,7 +1,7 @@
 // components/Sidebar.jsx (EKSİKLER TAMAMLANDI - SON HALİ)
 
 import React from 'react';
-import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid, Package } from 'lucide-react';
+import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid, Package, Users } from 'lucide-react';
 import { THEME } from '../utils/constants';
 
 const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userRole }) => {
@@ -25,6 +25,8 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
     
     // 6. YÖNETİMSEL (SADECE PATRON)
     { id: 'inventory', label: 'Stok & Tedarikçi', icon: Package, roles: ['patron'] },
+
+    { id: 'staff', label: 'Personel Yönetimi', icon: Users, roles: ['patron'] },
     
     // 👇 GERİ GETİRİLEN MADDELER 👇
     { id: 'recipe', label: 'Maliyet & Reçete', icon: ChefHat, roles: ['patron'] }, // Maliyet geri geldi

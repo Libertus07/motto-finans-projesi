@@ -21,8 +21,8 @@ const AuthScreen = ({ setUserRole }) => {
 
     // 🔐 ŞİFRELER / PIN KODLARI
     const PINS = {
-        'kasiyer': '1234',
-        'garson': '1111'  // 👇 Garson Şifresi
+        'kasiyer': '1786',
+        'garson': '3252'  // 👇 Garson Şifresi
     };
 
     const handleRoleSelect = (role) => {

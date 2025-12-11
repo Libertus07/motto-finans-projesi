@@ -58,10 +58,9 @@ const Products = ({ products, isPatron, userRole }) => {
                 sold: 0
             });
             
-            // 3. BAŞARILI SONUÇ
+            // 3. BAŞARILI SONUÇ: formu kapat ve alanları temizle (gösterim yok)
             setNewProduct({ name: '', price: '', category: CATEGORIES[0] });
             setIsFormOpen(false);
-            setInfoModal({ isOpen: true, type: 'success', title: 'Başarılı', message: 'Ürün menüye eklendi.' });
 
         } catch (error) {
             console.error("Ürün ekleme hatası:", error);
