@@ -13,7 +13,7 @@ import useFinanceData from './hooks/useFinanceData';
 import InfoModal from './components/InfoModal';
 import MaintenancePage from './components/MaintenancePage';
 
-const MAINTENANCE_MODE = false;
+const MAINTENANCE_MODE = true;
 
 // Sayfalar dinamik yukleniyor
 const Dashboard = lazy(() => import('./pages/Dashboard'));
