@@ -1,4 +1,4 @@
-// pages/Tables.jsx (PROFESYONEL SEÇENEKLİ VERSİYON)
+// pages/Tables.jsx (ORTAK HAVUZ SENKRONİZASYONLU ✅)
 
 import React, { useState, useEffect } from 'react';
 import { Table as TableIcon, Coffee, Trash2, Printer, CheckCircle2, CreditCard, Banknote, X, Sun, Cloud, Home, ArrowUp, Move, AlertTriangle } from 'lucide-react';
@@ -10,7 +10,10 @@ import Receipt from '../components/Receipt';
 import TableTransferModal from '../components/TableTransferModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TableCloseModal from '../components/TableCloseModal';
-import ProductOptionsModal from '../components/ProductOptionsModal'; // 👇 YENİ IMPORT
+import ProductOptionsModal from '../components/ProductOptionsModal'; 
+
+// 👇 DİKKAT: DİĞER SAYFALARLA AYNI SABİT MAĞAZA ADRESİ
+const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
 const Tables = ({ tables, products, userRole }) => { 
     const [selectedTable, setSelectedTable] = useState(null);
@@ -24,7 +27,6 @@ const Tables = ({ tables, products, userRole }) => {
     const [isEmptyConfirmOpen, setIsEmptyConfirmOpen] = useState(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
     
-    // 👇 ÜRÜN SEÇENEK STATE'LERİ
     const [productToCustomize, setProductToCustomize] = useState(null); 
 
     // Ödeme state'leri
@@ -37,9 +39,12 @@ const Tables = ({ tables, products, userRole }) => {
         { key: 'iban', label: 'Diğer Banka / IBAN' }
     ];
 
+    // Masa verisi değiştiğinde (başka biri sipariş girdiğinde) ekranı güncelle
     useEffect(() => {
         if (!selectedTable || !tables || tables.length === 0) return;
         const latestTable = tables.find(t => t.id === selectedTable.id);
+        
+        // Eğer seçili masada bir değişiklik varsa state'i güncelle
         if (latestTable && (latestTable.total !== selectedTable.total || latestTable.status !== selectedTable.status || latestTable.orders.length !== selectedTable.orders.length)) {
             setSelectedTable(latestTable);
         }
@@ -71,34 +76,32 @@ const Tables = ({ tables, products, userRole }) => {
         return <Home size={16}/>;
     };
 
-    // --- SİPARİŞ EKLEME SÜRECİ ---
+    // --- SİPARİŞ EKLEME SÜRECİ (ORTAK HAVUZA YAZAR) ---
     
-    // 1. Ürüne tıklanınca Modalı Aç
     const handleProductClick = (product) => {
         setProductToCustomize(product);
     };
 
-    // 2. Modal onaylayınca Veritabanına Yaz
     const handleConfirmOrder = async (customizedProduct) => {
         const user = auth.currentUser;
         if (!user || processing || !selectedTable) return;
-        setProductToCustomize(null); // Modalı kapat
+        setProductToCustomize(null); 
         setProcessing(true);
 
-        const tableRef = doc(db, 'artifacts', appId, 'users', user.uid, 'tables', selectedTable.id);
+        // 👇 ADRES GÜNCELLENDİ: 'shops/CURRENT_SHOP_ID/tables'
+        const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id);
+        
         try {
             const currentTable = tables.find(t => t.id === selectedTable.id);
             if (!currentTable) return;
 
-            // Benzersiz bir ID oluştur (Çünkü aynı üründen farklı özelliklerde olabilir)
-            // Örn: Latte (Küçük) ve Latte (Büyük) ayrı satır olmalı
             const orderId = customizedProduct.id + '-' + Date.now(); 
             
             const newOrder = {
                 id: orderId,
-                productId: customizedProduct.id, // Orijinal ID (Stok düşüşü için)
-                name: customizedProduct.name, // Modifiye edilmiş isim
-                price: customizedProduct.price, // Modifiye edilmiş fiyat
+                productId: customizedProduct.id, 
+                name: customizedProduct.name, 
+                price: customizedProduct.price, 
                 quantity: customizedProduct.quantity
             };
 
@@ -118,24 +121,25 @@ const Tables = ({ tables, products, userRole }) => {
         }
     };
 
+    // --- SİPARİŞ SİLME (ORTAK HAVUZDAN) ---
     const handleRemoveOrder = async (tableId, orderId, price) => {
         const user = auth.currentUser;
         if (!user || processing) return;
         setProcessing(true);
-        const tableRef = doc(db, 'artifacts', appId, 'users', user.uid, 'tables', tableId);
+        
+        // 👇 ADRES GÜNCELLENDİ
+        const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', tableId);
+        
         try {
             const currentTable = tables.find(t => t.id === tableId);
             if (!currentTable) return;
             
-            // ID'ye göre bul (Artık unique ID kullanıyoruz)
             const existingOrderIndex = currentTable.orders.findIndex(o => o.id === orderId);
             if (existingOrderIndex === -1) return;
             
             let newOrders = [...currentTable.orders];
-            const newTotal = currentTable.total - price; // 1 adet fiyatını düş
+            const newTotal = currentTable.total - price; 
             
-            // Miktar kontrolü yok, direkt silsin mi? Yoksa miktar azaltsın mı?
-            // Basitlik için: Miktar 1'den büyükse azalt, yoksa sil.
             if (newOrders[existingOrderIndex].quantity > 1) {
                 newOrders[existingOrderIndex].quantity -= 1;
             } else {
@@ -147,14 +151,18 @@ const Tables = ({ tables, products, userRole }) => {
         } catch (error) { console.error(error); } finally { setProcessing(false); }
     };
     
+    // --- MASAYI BOŞALT (ORTAK HAVUZ) ---
     const confirmMarkAsEmpty = async () => {
         if (!selectedTable) return;
-        const user = auth.currentUser;
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'tables', selectedTable.id), { status: 'empty', orders: [], total: 0 });
+        
+        // 👇 ADRES GÜNCELLENDİ
+        await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), { status: 'empty', orders: [], total: 0 });
+        
         setSelectedTable(prev => ({...prev, status: 'empty', orders: [], total: 0}));
         setIsEmptyConfirmOpen(false);
     };
 
+    // --- MASA KAPATMA & ÖDEME ALMA (EN ÖNEMLİ KISIM) ---
     const confirmCloseTable = async () => { 
         if (!selectedTable) return;
         setProcessing(true);
@@ -164,12 +172,22 @@ const Tables = ({ tables, products, userRole }) => {
             const transCardBank = paymentMethod === 'card' ? cardBank : null;
             const subMethodDisplay = paymentMethod === 'cash' ? 'Nakit' : `Kart (${cardBank.toUpperCase()})`;
 
-            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'transactions'), {
-                date: new Date().toISOString().split('T')[0], type: 'income', amount: selectedTable.total,
-                desc: `${selectedTable.name} (${selectedTable.zone}) Satışı`, method: transMethod, cardBank: transCardBank, category: 'Masa Satışı', subMethod: subMethodDisplay 
+            // 1. İŞLEMİ ORTAK KASAYA EKLE (Patron ve Kasiyer görsün)
+            // 👇 ADRES GÜNCELLENDİ: 'shops/CURRENT_SHOP_ID/transactions'
+            await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), {
+                date: new Date().toISOString().split('T')[0], 
+                type: 'income', 
+                amount: selectedTable.total,
+                desc: `${selectedTable.name} (${selectedTable.zone}) Satışı`, 
+                method: transMethod, 
+                cardBank: transCardBank, 
+                category: 'Masa Satışı', 
+                subMethod: subMethodDisplay 
             });
 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'tables', selectedTable.id), { orders: [], total: 0, status: 'needs_cleaning' });
+            // 2. MASAYI ORTAK ALANDA SIFIRLA
+            // 👇 ADRES GÜNCELLENDİ
+            await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), { orders: [], total: 0, status: 'needs_cleaning' });
             
             setIsCloseModalOpen(false);
             setSelectedTable(null);
@@ -178,14 +196,16 @@ const Tables = ({ tables, products, userRole }) => {
         } catch (error) { console.error(error); alert("Hata oluştu."); } finally { setProcessing(false); }
     };
 
+    // --- MASA TRANSFERİ (ORTAK HAVUZ) ---
     const handleTransfer = async (fromTableId, toTableId) => {
         setProcessing(true);
-        const user = auth.currentUser;
         const batch = writeBatch(db);
         const fromTable = tables.find(t => t.id === fromTableId);
         try {
-            batch.update(doc(db, 'artifacts', appId, 'users', user.uid, 'tables', fromTableId), { orders: [], total: 0, status: 'empty' });
-            batch.update(doc(db, 'artifacts', appId, 'users', user.uid, 'tables', toTableId), { orders: fromTable.orders, total: fromTable.total, status: 'occupied' });
+            // 👇 ADRESLER GÜNCELLENDİ
+            batch.update(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', fromTableId), { orders: [], total: 0, status: 'empty' });
+            batch.update(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', toTableId), { orders: fromTable.orders, total: fromTable.total, status: 'occupied' });
+            
             await batch.commit();
             setIsTransferModalOpen(false);
             setSelectedTable(null);
@@ -214,7 +234,6 @@ const Tables = ({ tables, products, userRole }) => {
             <ConfirmationModal isOpen={isEmptyConfirmOpen} onClose={() => setIsEmptyConfirmOpen(false)} onConfirm={confirmMarkAsEmpty} title="Masayı Temizle" message="Bu masayı boş ve temiz olarak işaretlemek istediğinize emin misiniz? (Siparişler silinir)" type="warning" confirmText="TEMİZLE"/>
             <TableCloseModal isOpen={isCloseModalOpen} onClose={() => setIsCloseModalOpen(false)} onConfirm={confirmCloseTable} tableName={selectedTable?.name} amount={selectedTable?.total} method={paymentMethod} bank={cardBank} loading={processing}/>
             
-            {/* 👇 YENİ ÜRÜN SEÇENEK MODALI */}
             <ProductOptionsModal 
                 isOpen={!!productToCustomize} 
                 onClose={() => setProductToCustomize(null)} 
@@ -257,7 +276,7 @@ const Tables = ({ tables, products, userRole }) => {
                         {categories.map(cat => ( <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-colors ${selectedCategory === cat ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{cat}</button> ))}
                     </div>
                     
-                    {/* 👇 ÜRÜN SEÇİMİ (TIKLAYINCA MODAL AÇAR) */}
+                    {/* ÜRÜN SEÇİMİ */}
                     <div className="grid grid-cols-2 gap-3 p-4 border-b border-slate-800 overflow-y-auto shrink-0 max-h-52 custom-scrollbar">
                         {availableProducts.map(product => (
                             <button key={product.id} onClick={() => handleProductClick(product)} className="p-3 bg-slate-800 border border-slate-700 rounded-xl hover:bg-slate-700 transition-colors active:scale-[0.98] flex flex-col items-start">
@@ -283,7 +302,7 @@ const Tables = ({ tables, products, userRole }) => {
                         ) : <div className="text-center py-10 text-slate-600"><Coffee size={32} className="mx-auto mb-2"/><p>Bu masada sipariş yok.</p></div>}
                     </div>
                     
-                    {/* ÖDEME KISMI (GARSON KONTROLÜ) */}
+                    {/* ÖDEME KISMI */}
                     <div className="p-5 bg-slate-900 border-t border-slate-800">
                         <div className="flex justify-between items-end mb-4"><span className="text-slate-400 text-sm mb-1 block">Toplam Tutar</span><span className="text-4xl font-extrabold text-white tracking-tight">{formatCurrency(selectedTable.total)} <span className="text-lg text-slate-500 font-normal">₺</span></span></div>
                         

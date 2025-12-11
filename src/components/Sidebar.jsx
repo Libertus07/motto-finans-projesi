@@ -1,7 +1,7 @@
-// components/Sidebar.jsx (EKSİKLER TAMAMLANDI - SON HALİ)
+// components/Sidebar.jsx
 
 import React from 'react';
-import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid, Package, Users } from 'lucide-react';
+import { LayoutDashboard, Wallet, FileText, Coffee, ChefHat, Coins, BarChart3, MessageSquare, Settings, User, Calculator, LayoutGrid, Package, Users, LogOut } from 'lucide-react'; // LogOut eklendi
 import { THEME } from '../utils/constants';
 
 const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userRole }) => {
@@ -13,27 +13,24 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
     // 2. SATIŞ EKRANI
     { id: 'pos', label: 'Satış Terminali (POS)', icon: Calculator, roles: ['patron', 'kasiyer'] },
 
-    // 3. MASA YÖNETİMİ (Garson Burayı Görebilir)
+    // 3. MASA YÖNETİMİ
     { id: 'tables', label: 'Masa Yönetimi', icon: LayoutGrid, roles: ['patron', 'kasiyer', 'garson'] },
     
     // 4. FİNANSAL İŞLEMLER
     { id: 'transactions', label: 'Kasa Hareketleri', icon: Wallet, roles: ['patron', 'kasiyer'] },
     { id: 'debts', label: 'Veresiye Defteri', icon: FileText, roles: ['patron', 'kasiyer'] }, 
     
-    // 5. ÜRÜN VE STOK (Garson Menüyü Görebilir)
+    // 5. ÜRÜN VE STOK
     { id: 'products', label: 'Menü & Ürün', icon: Coffee, roles: ['patron', 'kasiyer', 'garson'] },
     
     // 6. YÖNETİMSEL (SADECE PATRON)
     { id: 'inventory', label: 'Stok & Tedarikçi', icon: Package, roles: ['patron'] },
-
     { id: 'staff', label: 'Personel Yönetimi', icon: Users, roles: ['patron'] },
     
-    // 👇 GERİ GETİRİLEN MADDELER 👇
-    { id: 'recipe', label: 'Maliyet & Reçete', icon: ChefHat, roles: ['patron'] }, // Maliyet geri geldi
+    { id: 'recipe', label: 'Maliyet & Reçete', icon: ChefHat, roles: ['patron'] },
     { id: 'investments', label: 'Yatırımlar', icon: Coins, roles: ['patron'] },
     { id: 'stats', label: 'Raporlar', icon: BarChart3, roles: ['patron'] },
-    { id: 'assistant', label: 'Asistan (AI)', icon: MessageSquare, roles: ['patron'] }, // AI geri geldi
-    // 👆 ----------------------- 👆
+    { id: 'assistant', label: 'Asistan (AI)', icon: MessageSquare, roles: ['patron'] },
 
     { id: 'settings', label: 'Ayarlar', icon: Settings, roles: ['patron', 'kasiyer'] },
   ];
@@ -49,6 +46,12 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
   };
 
   const roleUI = getRoleUI();
+
+  // Çıkış Fonksiyonu
+  const handleLogout = () => {
+      localStorage.removeItem('motto_user_role'); // Hafızadan sil
+      window.location.reload(); // Sayfayı yenile (Auth ekranı gelecek)
+  };
 
   return (
     <div className={`fixed inset-y-0 left-0 z-50 w-64 ${THEME.bg} border-r ${THEME.border} transition-transform duration-300 transform ${isMobile ? '-translate-x-full' : 'translate-x-0'} md:translate-x-0 md:static flex flex-col`}>
@@ -75,7 +78,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
       </div>
 
       <div className="p-4 border-t border-slate-800">
-        <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 flex items-center gap-3">
+        <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 flex items-center gap-3 mb-3">
           <div className={`p-2 rounded-full ${roleUI.color}`}>
             <User size={16} className="text-white"/>
           </div>
@@ -84,6 +87,15 @@ const Sidebar = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userR
             <p className="text-[10px] text-slate-500 truncate">{roleUI.desc}</p>
           </div>
         </div>
+
+        {/* 👇 ÇIKIŞ BUTONU EKLENDİ 👇 */}
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-red-900/20 text-red-400 hover:bg-red-900/40 hover:text-red-300 transition-colors border border-red-900/30 text-xs font-bold"
+        >
+          <LogOut size={14} />
+          ÇIKIŞ YAP
+        </button>
       </div>
     </div>
   );

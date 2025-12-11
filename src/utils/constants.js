@@ -1,6 +1,11 @@
+// utils/constants.js
+
 // ✅ DÜZELTME: Gemini API Key artık .env'den VITE_ önekiyle çekiliyor.
 export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "API Anahtarı Yüklenemedi";
 export const ADMIN_PASSWORD = 'Motto1786';
+
+// 👇 BURASI EKLENDİ: Tüm kullanıcıların ortak bağlanacağı dükkan kimliği
+export const SHOP_ID = 'motto_coffee_sube_01'; 
 
 export const THEME = {
   bg: "bg-slate-950",
@@ -69,7 +74,7 @@ export const INITIAL_NOTES = [
   { id: 'n1', text: 'Vergi ödemesi ayın 26\'sında unutma!', done: false, createdAt: Date.now() },
 ];
 
-// 50 MASA, BÖLGELER VE SIRALAMA NUMARASI
+// 50 MASA
 export const INITIAL_TABLES = Array.from({ length: 50 }, (_, i) => {
     const num = i + 1;
     let zone = 'Bahçe';
@@ -82,7 +87,7 @@ export const INITIAL_TABLES = Array.from({ length: 50 }, (_, i) => {
     return {
         id: `table-${num}`,
         name: `Masa ${num}`,
-        number: num, // <--- YENİ EKLENEN SIRALAMA ANAHTARI
+        number: num,
         zone: zone,
         status: 'empty',
         orders: [],

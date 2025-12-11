@@ -1,8 +1,8 @@
-// src/App.jsx (PERSONEL VERİSİ BAĞLANDI VE OTURUM HATIRLAMA EKLENDİ)
+// src/App.jsx (GÜNCELLENDİ: Kasiyer'e Ürün Ekleme Yetkisi Tanımlandı)
 
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { Loader2, Menu, Coffee, Construction } from 'lucide-react'; 
+import { Loader2, Menu } from 'lucide-react'; 
 
 import { auth } from './services/firebase';
 import { THEME } from './utils/constants';
@@ -13,10 +13,9 @@ import useFinanceData from './hooks/useFinanceData';
 import InfoModal from './components/InfoModal';
 import MaintenancePage from './components/MaintenancePage';
 
-// 👇 BAKIM MODU AYARI
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
-// Sayfalar dinamik yukleniyor (Lazy Loading)
+// Sayfalar dinamik yukleniyor
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Transactions = lazy(() => import('./pages/Transactions'));
 const Debts = lazy(() => import('./pages/Debts'));
@@ -40,25 +39,17 @@ export default function PatronFinancePro() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // Maaş Bildirimi
   const [salaryNotification, setSalaryNotification] = useState({ isOpen: false, names: '' });
 
-  // Verileri Hook'tan Çek
   const {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings,
-    staff, // 👈 PERSONEL VERİSİ ARTIK BURAYA GELİYOR
+    staff, 
   } = useFinanceData(user); 
 
-  // --- OTURUM YÖNETİMİ ---
   useEffect(() => {
-    // 1. Sayfa yenilendiğinde eski rolü hatırla
-    const savedRole = localStorage.getItem('motto_user_role');
-    if (savedRole) {
-        setUserRole(savedRole);
-    }
-
+    // localStorage kontrolü kapalı (her seferinde giriş ekranı)
     const initAuth = async () => { 
         try { await signInAnonymously(auth); } 
         catch (e) { console.error("Anonim giriş hatası:", e); } 
@@ -73,24 +64,19 @@ export default function PatronFinancePro() {
     });
   }, []);
 
-  // 2. Rol değişince hafızaya kaydet
   useEffect(() => {
     if (userRole) {
         localStorage.setItem('motto_user_role', userRole);
-        
-        // İlk açılış yönlendirmesi
         if (activeTab === 'pos' && userRole === 'patron') setActiveTab('dashboard');
         if (userRole === 'kasiyer') setActiveTab('pos');
         if (userRole === 'garson') setActiveTab('tables');
     }
   }, [userRole]);
 
-  // Maaş Bildirimi Kontrolü
   useEffect(() => {
     if (userRole === 'patron' && staff && staff.length > 0) {
         const today = new Date().getDate();
         const pendingPayments = staff.filter(p => Number(p.salaryDay) === today);
-        
         if (pendingPayments.length > 0) {
             const notificationKey = `salary_notified_${new Date().toDateString()}`;
             if (!sessionStorage.getItem(notificationKey)) {
@@ -104,11 +90,16 @@ export default function PatronFinancePro() {
   if (MAINTENANCE_MODE) return <MaintenancePage />;
 
   const renderContent = () => {
+    // 1. Yetki Kontrolü: Garson ve Kasiyerin görebileceği sayfalar
     if (userRole === 'kasiyer' || userRole === 'garson') {
-        const allowedTabs = userRole === 'garson' ? ['tables', 'products'] : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; 
+        const allowedTabs = userRole === 'garson' 
+            ? ['tables', 'products'] // Garson sadece Masalar ve Ürünleri görür
+            : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings']; // Kasiyer yetkileri
+        
         if (!allowedTabs.includes(activeTab)) return <div className="text-center py-20 text-slate-500">Yetkisiz Alan</div>;
     }
 
+    // 2. Sayfa Yönlendirmeleri
     switch (activeTab) {
       case 'dashboard': return <Dashboard stats={stats} transactions={transactions} monthlyGoal={monthlyGoal} calculateFutureCashflow={calculateFutureCashflow} getProfitabilityWarnings={() => getProfitabilityWarnings(products)} tables={tables}/>;
       case 'zreport': return <ZReport transactions={transactions} />;
@@ -116,7 +107,17 @@ export default function PatronFinancePro() {
       case 'tables': return <Tables tables={tables} products={products} ingredients={ingredients} userRole={userRole} />;
       case 'transactions': return <Transactions transactions={transactions} quickActions={quickActions} isPatron={userRole === 'patron'}/>;
       case 'debts': return <Debts debts={debts} stats={stats} />;
-      case 'products': return <Products products={products} isPatron={userRole === 'patron'} userRole={userRole} />;
+      
+      // 👇 BURASI GÜNCELLENDİ: 'canEdit' yetkisi eklendi (Patron VEYA Kasiyer düzenleyebilir)
+      case 'products': return (
+          <Products 
+            products={products} 
+            isPatron={userRole === 'patron'} // Patron maliyetleri görür
+            canEdit={userRole === 'patron' || userRole === 'kasiyer'} // Kasiyer ve Patron ekleme/silme yapabilir
+            userRole={userRole} 
+          />
+      );
+      
       case 'inventory': return <Inventory ingredients={ingredients} debts={debts} />;
       case 'recipe': return <Recipe ingredients={ingredients} products={products} />;
       case 'investments': return <Investments investments={investments} marketRates={marketRates} />;
