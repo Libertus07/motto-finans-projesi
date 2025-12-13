@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { Loader2, Menu, WifiOff, MonitorCheck } from 'lucide-react'; 
+import { Loader2, Menu, MonitorCheck } from 'lucide-react'; 
 
 import { auth } from './services/firebase';
 import { THEME } from './utils/constants';
@@ -12,6 +12,8 @@ import AuthScreen from './components/AuthScreen';
 import useFinanceData from './hooks/useFinanceData';
 import InfoModal from './components/InfoModal';
 import MaintenancePage from './components/MaintenancePage';
+// 👇 YENİ: Premium Network Island Bileşeni
+import NetworkStatus from './components/NetworkStatus';
 
 const MAINTENANCE_MODE = false;
 
@@ -55,9 +57,6 @@ export default function PatronFinancePro() {
   const [activeTab, setActiveTab] = useState('pos'); 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // 🟢 İNTERNET BAĞLANTI KONTROLÜ
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  
   const [salaryNotification, setSalaryNotification] = useState({ isOpen: false, names: '' });
 
   // Verileri Hook'tan Çek
@@ -65,10 +64,10 @@ export default function PatronFinancePro() {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings,
-    staff, categories, loading // hook'tan gelen loading
+    staff, categories, loading 
   } = useFinanceData(user); 
 
-  // Auth ve Network Dinleyicileri
+  // Auth Dinleyicisi
   useEffect(() => {
     const initAuth = async () => { 
         try { await signInAnonymously(auth); } 
@@ -76,18 +75,10 @@ export default function PatronFinancePro() {
     };
     initAuth();
 
-    // Network Dinleyicileri
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     const unsubAuth = onAuthStateChanged(auth, (currentUser) => { if (currentUser) setUser(currentUser); });
 
     return () => {
         unsubAuth();
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
@@ -118,7 +109,6 @@ export default function PatronFinancePro() {
   
   if (MAINTENANCE_MODE) return <MaintenancePage />;
   
-  // Yükleme Ekranı (Sadece giriş yapılmışsa ve veri bekleniyorsa göster, auth ekranında gösterme)
   if (loading && userRole) return <LoadingScreen />;
   
   if (!userRole) return <AuthScreen setUserRole={setUserRole} />;
@@ -152,12 +142,8 @@ export default function PatronFinancePro() {
   return (
     <div className={`min-h-screen ${THEME.bg} text-slate-200 font-sans flex`}>
       
-      {/* ⚠️ OFFLINE UYARISI */}
-      {!isOnline && (
-          <div className="fixed top-0 left-0 right-0 z-[60] bg-red-600 text-white text-[10px] md:text-xs font-bold text-center py-1.5 shadow-lg animate-in slide-in-from-top duration-300 flex items-center justify-center gap-2">
-              <WifiOff size={14} /> ÇEVRİMDIŞI MOD - İnternet bağlantısı yok, veriler cihazda saklanıyor.
-          </div>
-      )}
+      {/* 👇 YENİ: Profesyonel Çevrimdışı Bildirimi (Dynamic Island) */}
+      <NetworkStatus />
 
       {/* Mobil Menü Butonu */}
       <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-800/90 backdrop-blur-md rounded-xl text-white shadow-lg border border-slate-700 active:scale-95 transition-transform"><Menu size={24} /></button>
@@ -167,7 +153,7 @@ export default function PatronFinancePro() {
       
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isMobile={!isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} userRole={userRole} />
 
-      <main className={`flex-1 h-screen overflow-y-auto w-full relative ${isMobileMenuOpen ? 'overflow-hidden' : ''} ${!isOnline ? 'pt-6' : ''}`}>
+      <main className={`flex-1 h-screen overflow-y-auto w-full relative ${isMobileMenuOpen ? 'overflow-hidden' : ''}`}>
         <div className="p-4 md:p-6 lg:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto">
           <Suspense fallback={<div className="flex flex-col items-center justify-center h-64 text-indigo-400 gap-3"><Loader2 className="animate-spin" size={32}/><span className="text-xs font-medium uppercase tracking-wider opacity-70">Sayfa Yükleniyor...</span></div>}>
             {renderContent()}
