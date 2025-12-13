@@ -13,7 +13,7 @@ import useFinanceData from './hooks/useFinanceData';
 import InfoModal from './components/InfoModal';
 import MaintenancePage from './components/MaintenancePage';
 
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 // Sayfalar (Code Splitting)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
