@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 // 👇 FileText EKLENDİ
-import { ArrowUpCircle, ArrowDownCircle, Search, Filter, Trash2, Calendar, Wallet, CreditCard, Banknote, Plus, Minus, RefreshCw, Zap, Settings, History, ArrowUpRight, ArrowDownRight, PlusCircle, MinusCircle, X, FileText } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Search, Filter, Trash2, Calendar, Wallet, CreditCard, Banknote, Plus, Minus, RefreshCw, Zap, Settings, History, ArrowUpRight, ArrowDownRight, PlusCircle, MinusCircle, X, FileText, ChevronDown, Smartphone } from 'lucide-react';
 import { addDoc, deleteDoc, doc, collection, writeBatch } from 'firebase/firestore';
 import { db, appId, auth } from '../services/firebase';
 import { formatCurrency, formatDate, getSubMethod } from '../utils/helpers';

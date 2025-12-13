@@ -111,28 +111,10 @@ export default function useFinanceData(user) {
     return () => unsubscribers.forEach(unsub => unsub());
   }, [user]);
 
-  // Döviz Kurları (Hata Korumalı Versiyon)
+  // Döviz Kurları (Varsayılan Değerler)
   useEffect(() => {
-        const fetchRates = async () => {
-            try {
-                const response = await fetch('https://api.genelpara.com/embed/altin.json');
-                if (!response.ok) throw new Error("Sunucu yanıt vermedi");
-                
-                const text = await response.text();
-                if (!text.startsWith('{')) throw new Error("API JSON döndürmedi");
-
-                const data = JSON.parse(text);
-                setMarketRates({
-                    gold: parseFloat(data.GA.satis),
-                    dollar: parseFloat(data.USD.satis),
-                    euro: parseFloat(data.EUR.satis)
-                });
-            } catch (error) { 
-                console.warn("⚠️ Döviz verisi çekilemedi, varsayılan değerler kullanılıyor.", error.message);
-                setMarketRates({ gold: 2950, dollar: 34.50, euro: 37.20 });
-            }
-        };
-        fetchRates();
+        // API endpoint kaldırıldı, varsayılan değerler kullanılıyor
+        setMarketRates({ gold: 2950, dollar: 34.50, euro: 37.20 });
   }, []);
 
   const stats = useMemo(() => {

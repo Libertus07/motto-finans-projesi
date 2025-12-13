@@ -2,8 +2,8 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-// 👇 enableIndexedDbPersistence eklendi
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+// 👇 Yeni API: initializeFirestore ve persistentLocalCache kullanılıyor
+import { initializeFirestore, getFirestore, persistentLocalCache, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage'; // Depolama için eklendi
 
 // Aşama 1'de çalışan (ve doğru olduğu kanıtlanan) yedek konfigürasyon.
@@ -54,24 +54,23 @@ const app = initializeApp(finalConfig);
 
 // Servisleri başlat
 const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app); // Storage tanımlandı
 
-// 👇 ÇEVRİMDIŞI VERİ DESTEĞİNİ AKTİF ETME KODU (YENİ EKLENEN KISIM)
+// 👇 YENİ API: Firestore'u persistent cache ile başlat
+let db;
 try {
-  // Verileri tarayıcı hafızasına (IndexedDB) kaydeder
-  enableIndexedDbPersistence(db).catch((err) => {
-      if (err.code == 'failed-precondition') {
-          // Birden fazla sekme açıksa sadece birinde çalışır
-          console.log('Çoklu sekme hatası - Offline Persistence devre dışı');
-      } else if (err.code == 'unimplemented') {
-          console.log('Tarayıcı bu özelliği desteklemiyor');
-      }
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED
+    })
   });
   console.log("✅ Offline mod (Persistence) aktif edildi.");
 } catch (e) {
-  console.log("Offline mode error:", e);
+  // Hata durumunda fallback olarak normal Firestore kullan
+  db = getFirestore(app);
+  console.log("⚠️ Offline mod başlatılamadı, normal mod kullanılıyor:", e);
 }
+
+const storage = getStorage(app); // Storage tanımlandı
 
 // Dışarıya aktar
 export { auth, db, storage };
