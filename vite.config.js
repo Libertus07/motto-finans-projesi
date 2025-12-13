@@ -1,3 +1,5 @@
+// vite.config.js
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -17,25 +19,30 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'logo.png', // 👈 Düzeltildi: Kendi yüklediğiniz logo
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable' // 👈 Eklendi: Android ikon çerçevesi sorunu için
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'logo.png', // 👈 Düzeltildi
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 3000000 // Cache limitini artırdık
+        maximumFileSizeToCacheInBytes: 3000000 // Cache limiti korundu
       }
     })
   ],
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
+      // 👇 HATA ÇÖZÜMÜ BURASI: Next.js modüllerini dışlıyoruz
+      external: ['next/navigation', 'next/headers', 'next/compat/router'],
+      
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
