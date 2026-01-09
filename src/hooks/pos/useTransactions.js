@@ -97,7 +97,7 @@ export const useTransactions = () => {
             }, { merge: true });
         }
         return { success: true, id: docRef.id };
-    }, [appId]);
+    }, []); // Removed appId from dependencies
 
     /**
      * [v2 GÜNCELLEME] İşlemi İptal Et (Voiding)

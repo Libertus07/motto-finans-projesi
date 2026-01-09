@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChefHat, Package, Settings, Move, PlusCircle, AlertTriangle, Scale, X, Loader2, Wand2, Sparkles, Trash2, Save } from 'lucide-react';
 import { addDoc, deleteDoc, updateDoc, setDoc, doc, collection, getDoc } from 'firebase/firestore'; 
-import { db, appId, auth } from '../services/firebase';
+import { db, appId } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import ConfirmationModal from '../components/ConfirmationModal';
 import InfoModal from '../components/InfoModal'; 

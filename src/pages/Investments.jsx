@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Coins, TrendingUp, PlusCircle, Trash2, PieChart as PieIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { addDoc, deleteDoc, updateDoc, doc, collection, writeBatch } from 'firebase/firestore';
-import { db, appId, auth } from '../services/firebase';
+import { db, appId } from '../services/firebase';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import { INITIAL_MARKET_RATES, COLORS } from '../utils/constants';
 import LiquidationModal from '../components/LiquidationModal';

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { auth, db, appId } from '../services/firebase';
+import { db, appId } from '../services/firebase';
 
 // Kullanıcıya ve filtreye göre dinamik olarak veri çeken Hook
 export default function useFilteredTransactions(user, reportFilter) {
@@ -10,7 +10,8 @@ export default function useFilteredTransactions(user, reportFilter) {
     useEffect(() => {
         if (!user || !db || !user.uid || !reportFilter) return;
         
-        setLoading(true);
+        // Removed synchronous setLoading(true) to prevent cascading renders
+
         const uid = user.uid;
         const transactionsRef = collection(db, 'artifacts', appId, 'users', uid, 'transactions');
         let dateQuery;

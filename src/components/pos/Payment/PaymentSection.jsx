@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { Printer, Wallet, Zap, CheckCircle2, Coins } from 'lucide-react';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import BankSelector from './BankSelector';
-import ChangeDisplay from './ChangeDisplay';
 import LoyaltyPointsSelector from './LoyaltyPointsSelector';
 
 const PaymentSection = ({ 
@@ -11,7 +10,6 @@ const PaymentSection = ({
     isDarkMode,
     paymentMethod,
     cardBank,
-    receivedAmount,
     currentPayable,
     processing,
     successMsg,
@@ -28,27 +26,11 @@ const PaymentSection = ({
     // Handlers
     onMethodChange,
     onBankChange,
-    onClearReceived,
     onPrint,
     onCheckout,
-    
-    // Modal checks
-    showChangeModal,
-    showManualModal,
-    showPartialModal,
-    showHistoryModal
 }) => {
     const [showPointsSelector, setShowPointsSelector] = useState(false);
     
-    const showChangeDisplay = 
-        paymentMethod === 'cash' && 
-        receivedAmount && 
-        Number(receivedAmount) > 0 && 
-        !showChangeModal && 
-        !showManualModal && 
-        !showPartialModal && 
-        !showHistoryModal;
-
     return (
         <>
             {/* ÖDEME YÖNTEMİ SEÇİCİ */}

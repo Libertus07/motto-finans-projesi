@@ -1,11 +1,10 @@
 // pages/Debts.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
 
 import React, { useState } from 'react';
-import { PlusCircle, Smartphone, Calendar, Trash2, CheckCircle2, Wallet, Users, AlertCircle, ArrowRight } from 'lucide-react';
-import { addDoc, deleteDoc, doc, collection, writeBatch, updateDoc } from 'firebase/firestore'; // updateDoc eklendi
-import { db, appId, auth } from '../services/firebase';
+import { PlusCircle, Users, AlertCircle, Trash2, Wallet } from 'lucide-react';
+import { addDoc, deleteDoc, doc, collection, writeBatch } from 'firebase/firestore';
+import { db, appId } from '../services/firebase';
 import { formatCurrency, formatDate } from '../utils/helpers';
-import { THEME } from '../utils/constants';
 import PaymentModal from '../components/PaymentModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import InfoModal from '../components/InfoModal';
@@ -13,7 +12,7 @@ import InfoModal from '../components/InfoModal';
 // 👇 MAĞAZA ID
 const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
 
-const Debts = ({ debts, stats }) => {
+const Debts = ({ debts }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('active'); // active, history
     const [deleteId, setDeleteId] = useState(null);

@@ -1,21 +1,23 @@
 // components/pos/Receipt.jsx
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import { Coffee, Instagram, Wifi, MapPin, Phone } from 'lucide-react';
 import { formatCurrency } from '../utils/helpers';
 
 const Receipt = forwardRef(({ data }, ref) => {
-    if (!data) return null;
+    // Math.random() yerine state kullanarak stabil bir ID üretimi sağlıyoruz
+    const [orderNo, setOrderNo] = useState(null);
+
+    useEffect(() => {
+        if (data) {
+            setOrderNo(data.subDetails?.orderNo || Math.floor(Math.random() * 8999) + 1000);
+        }
+    }, [data]);
+
+    if (!data || !orderNo) return null;
 
     const { type, items, total, date, subDetails } = data;
     const rawTotal = subDetails?.rawTotal || total;
     const discount = subDetails?.discount || 0;
-    const orderNo = subDetails?.orderNo || Math.floor(Math.random() * 8999) + 1000;
-
-    // Süsleme Çizgileri
-    const Divider = ({ type = 'dashed' }) => (
-        <div className={`w-full border-t border-black my-2 ${type === 'dashed' ? 'border-dashed' : 'border-double'}`} 
-             style={{ borderTopWidth: type === 'double' ? '3px' : '1px' }} />
-    );
 
     return (
         <div ref={ref} className="w-[80mm] min-h-[120mm] bg-white text-black font-mono p-4 mx-auto antialiased">
@@ -121,37 +123,35 @@ const Receipt = forwardRef(({ data }, ref) => {
                     </div>
                 </div>
 
-                {/* QR Code Alanı - Senin Kodun Entegre Edildi */}
-    <div className="w-full border-2 border-black p-2 flex items-center gap-4 mb-6">
-        <div className="p-1 bg-white border border-black shrink-0">
-            {/* Senin QR Kodun */}
-            <a 
-                href="https://me-qr.com" 
-                target="_blank" 
-                rel="noreferrer"
-                style={{ cursor: 'pointer', display: 'block' }}
-            >
-                <img 
-                    src="https://storage2.me-qr.com/qr/292842623.png?v=1766813340" 
-                    className="w-16 h-16 object-contain" 
-                    alt="Motto Coffee QR Code" 
-                />
-            </a>
-        </div>
-        
-        <div className="flex flex-col">
-            <span className="text-[9px] font-black uppercase tracking-tighter leading-none mb-1">
-                PUAN KAZAN / TAKİP ET
-            </span>
-            <span className="text-[8px] leading-tight opacity-70 italic">
-                Karekodu okutarak sadakat programımıza katılabilir, güncel kampanyalarımızdan haberdar olabilirsiniz.
-            </span>
-        </div>
-    </div>
+                {/* QR Code Alanı */}
+                <div className="w-full border-2 border-black p-2 flex items-center gap-4 mb-6">
+                    <div className="p-1 bg-white border border-black shrink-0">
+                        <a
+                            href="https://me-qr.com"
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ cursor: 'pointer', display: 'block' }}
+                        >
+                            <img
+                                src="https://storage2.me-qr.com/qr/292842623.png?v=1766813340"
+                                className="w-16 h-16 object-contain"
+                                alt="Motto Coffee QR Code"
+                            />
+                        </a>
+                    </div>
 
-    {/* Slogan ve Teşekkür */}
-    <p className="text-[11px] font-black italic mb-1 uppercase tracking-wider">Kahvenin En İyi Hali</p>
-    <p className="text-[8px] opacity-50 uppercase tracking-[0.2em] mb-4 text-center">Afiyet Olsun / Yine Bekleriz</p>
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-black uppercase tracking-tighter leading-none mb-1">
+                            PUAN KAZAN / TAKİP ET
+                        </span>
+                        <span className="text-[8px] leading-tight opacity-70 italic">
+                            Karekodu okutarak sadakat programımıza katılabilir, güncel kampanyalarımızdan haberdar olabilirsiniz.
+                        </span>
+                    </div>
+                </div>
+
+                <p className="text-[11px] font-black italic mb-1 uppercase tracking-wider">Kahvenin En İyi Hali</p>
+                <p className="text-[8px] opacity-50 uppercase tracking-[0.2em] mb-4 text-center">Afiyet Olsun / Yine Bekleriz</p>
                 
                 <div className="text-[7px] opacity-30 tracking-[0.5em] overflow-hidden whitespace-nowrap">
                     *****************************************************
