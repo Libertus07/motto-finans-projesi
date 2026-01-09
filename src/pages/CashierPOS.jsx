@@ -1,164 +1,533 @@
-// pages/CashierPOS.jsx (ORTAK HAVUZ ENTEGRASYONU ✅)
+// pages/CashierPOS.jsx - FULLY REFACTORED VERSION
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 
-import React, { useState, useMemo } from 'react';
-import { ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Coffee, X, CheckCircle2, Smartphone, Search, Printer } from 'lucide-react';
-import { addDoc, collection } from 'firebase/firestore';
-import { db, appId, auth } from '../services/firebase';
-import { formatCurrency } from '../utils/helpers';
-import { THEME } from '../utils/constants';
-import { deductStockForTransaction } from '../utils/stockManager';
+// 🎯 CUSTOM HOOKS
+import { useCart } from '../hooks/pos/useCart';
+import { usePayment } from '../hooks/pos/usePayment';
+import { useLoyalty } from '../hooks/pos/useLoyalty';
+import { useTransactions } from '../hooks/pos/useTransactions';
+
+// 🎨 COMPONENTS
+import CartPanel from '../components/pos/Cart/CartPanel';
+import MenuPanel from '../components/pos/Menu/MenuPanel';
+import PaymentSection from '../components/pos/Payment/PaymentSection';
 import Receipt from '../components/Receipt';
+import ProductOptionsModal from '../components/ProductOptionsModal';
+import MobileTabBar from '../components/pos/shared/MobileTabBar';
 
-// 👇 MAĞAZA ID
-const CURRENT_SHOP_ID = 'motto_coffee_sube_01';
+// 🔔 MODALS
+import ChangeCalculatorModal from '../components/pos/Modals/ChangeCalculatorModal';
+import RoundPriceModal from '../components/pos/Modals/RoundPriceModal';
+import PartialPaymentModal from '../components/pos/Modals/PartialPaymentModal';
+import HistoryModal from '../components/pos/Modals/HistoryModal';
+import HeldOrdersModal from '../components/pos/Modals/HeldOrdersModal';
+import LoyaltyModal from '../components/pos/Modals/LoyaltyModal';
+import RegisterModal from '../components/pos/Loyalty/RegisterModal';
+import ConfirmDialog from '../components/pos/shared/ConfirmDialog';
 
-const CashierPOS = ({ products, ingredients }) => {
-    const [cart, setCart] = useState([]);
+// 🛠️ UTILS & CONSTANTS
+import { calculateTotals, getCurrentPayable } from '../utils/pos/calculations';
+import { playCashSound } from '../utils/pos/sounds';
+import { formatCurrency } from '../utils/helpers';
+import { bankOptions } from '../utils/pos/themes';
+
+const CashierPOS = ({ products = [] }) => {
+    // 🌗 CORE STATE
+    const [isDarkMode, setIsDarkMode] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState('Tümü');
-    const [paymentMethod, setPaymentMethod] = useState('cash');
-    const [cardBank, setCardBank] = useState('ziraat');
     const [searchTerm, setSearchTerm] = useState('');
+    const [sortOption, setSortOption] = useState('popularity');
+    const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('menu');
+    
+    // 🎭 MODAL STATE
+    const [showChangeModal, setShowChangeModal] = useState(false);
+    const [showManualModal, setShowManualModal] = useState(false);
+    const [showPartialModal, setShowPartialModal] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
+    const [productToCustomize, setProductToCustomize] = useState(null);
+    
+    // 🔄 UI STATE
     const [processing, setProcessing] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     const [printData, setPrintData] = useState(null);
+    const [heldOrders, setHeldOrders] = useState([]);
+    const [loyaltyDiscount, setLoyaltyDiscount] = useState(0); // Applied loyalty discount
+    
+    const receiptRef = useRef(null);
 
-    const bankOptions = [
-        { key: 'ziraat', label: 'ZİRAAT' },
-        { key: 'halk', label: 'HALK' },
-        { key: 'iban', label: 'DİĞER / IBAN' }
-    ];
+    // 🪝 CUSTOM HOOKS
+    const cartHook = useCart();
+    const paymentHook = usePayment();
+    const loyaltyHook = useLoyalty();
+    const transactionsHook = useTransactions();
 
-    const addToCart = (product) => {
-        const existingItem = cart.find(item => item.id === product.id);
-        if (existingItem) {
-            setCart(cart.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
+    // 📋 COMPUTED VALUES
+    const categories = useMemo(() => 
+        ['Tümü', ...new Set(products.map(p => p.category))], 
+        [products]
+    );
+
+    const totals = useMemo(() => calculateTotals({
+        cart: cartHook.cart,
+        discountRate: paymentHook.discountRate,
+        splitCount: paymentHook.splitCount,
+        customTotal: paymentHook.customTotal,
+        isPartialMode: paymentHook.isPartialMode,
+        paidSoFar: paymentHook.paidSoFar,
+        isSelectionMode: cartHook.isSelectionMode,
+        selectedItems: cartHook.selectedItems
+    }), [
+        cartHook.cart, 
+        cartHook.isSelectionMode, 
+        cartHook.selectedItems,
+        paymentHook.discountRate, 
+        paymentHook.splitCount, 
+        paymentHook.customTotal,
+        paymentHook.isPartialMode, 
+        paymentHook.paidSoFar
+    ]);
+
+    const currentPayable = getCurrentPayable(
+        paymentHook.isPartialMode,
+        totals.partialPayable,
+        cartHook.isSelectionMode,
+        totals.finalTotal
+    );
+
+    const totalItems = useMemo(() => 
+        cartHook.isSelectionMode 
+            ? Object.values(cartHook.selectedItems).reduce((sum, qty) => sum + qty, 0) 
+            : cartHook.cart.reduce((sum, item) => sum + item.quantity, 0),
+        [cartHook.cart, cartHook.isSelectionMode, cartHook.selectedItems]
+    );
+
+    const activeBankStyle = useMemo(() => 
+        bankOptions.find(b => b.key === paymentHook.cardBank) || bankOptions[0],
+        [paymentHook.cardBank]
+    );
+
+    const processedProducts = useMemo(() => {
+        let result = products.filter(p => 
+            (selectedCategory === 'Tümü' || p.category === selectedCategory) && 
+            p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        return result.sort((a, b) => {
+            switch(sortOption) {
+                case 'price-asc': return a.price - b.price;
+                case 'price-desc': return b.price - a.price;
+                case 'name': return a.name.localeCompare(b.name);
+                default: return (b.sales || 0) - (a.sales || 0);
+            }
+        });
+    }, [products, selectedCategory, searchTerm, sortOption]);
+
+    // 🔧 HANDLERS
+    const handleProductClick = (product) => {
+        if (product.options && product.options.length > 0) {
+            setProductToCustomize(product);
         } else {
-            setCart([...cart, { ...product, quantity: 1 }]);
+            cartHook.addToCart(product);
         }
     };
 
-    const removeFromCart = (productId) => {
-        setCart(cart.filter(item => item.id !== productId));
+    const handleOptionConfirm = (customizedProduct) => {
+        cartHook.addToCart(customizedProduct);
+        setProductToCustomize(null);
     };
 
-    const updateQuantity = (productId, delta) => {
-        setCart(cart.map(item => {
-            if (item.id === productId) {
-                return { ...item, quantity: Math.max(1, item.quantity + delta) };
-            }
-            return item;
-        }));
+    const handleHoldOrder = () => {
+        if (cartHook.cart.length === 0) return;
+        const newHold = {
+            id: Date.now(),
+            items: cartHook.cart,
+            total: totals.subTotal,
+            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+        };
+        setHeldOrders([newHold, ...heldOrders]);
+        cartHook.setCart([]);
+        paymentHook.resetPayment();
+        alert("Sipariş beklemeye alındı.");
     };
 
-    const totalAmount = useMemo(() => cart.reduce((total, item) => total + (item.price * item.quantity), 0), [cart]);
+    const handleRestoreOrder = (holdId) => {
+        if (cartHook.cart.length > 0) {
+            if(!window.confirm("Mevcut sepet silinecek. Emin misiniz?")) return;
+        }
+        const orderToRestore = heldOrders.find(h => h.id === holdId);
+        if (orderToRestore) {
+            cartHook.setCart(orderToRestore.items);
+            setHeldOrders(heldOrders.filter(h => h.id !== holdId));
+            setShowHeldOrdersModal(false);
+        }
+    };
 
     const handlePrintReceipt = () => {
-        if (cart.length === 0) return;
+        if (cartHook.cart.length === 0) return;
+        
+        const itemsToPrint = cartHook.isSelectionMode 
+            ? cartHook.cart
+                .filter(item => cartHook.selectedItems[item.id])
+                .map(item => ({ 
+                    ...item, 
+                    quantity: cartHook.selectedItems[item.id] 
+                }))
+            : cartHook.cart;
+        
         setPrintData({
-            title: 'Hızlı Satış Fişi', type: 'Satış Fişi', date: new Date().toLocaleString('tr-TR'),
-            items: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })), total: totalAmount
+            title: cartHook.isSelectionMode 
+                ? 'Parçalı Ödeme Fişi' 
+                : (paymentHook.isPartialMode ? 'Hesap Özeti' : 'Adisyon Fişi'),
+            type: 'Bilgi Fişi',
+            date: new Date().toLocaleString('tr-TR'),
+            items: itemsToPrint.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price
+            })),
+            total: totals.finalTotal,
+            subDetails: {
+                rawTotal: totals.subTotal,
+                discount: totals.discountAmount > 0 ? totals.discountAmount : null,
+                paid: paymentHook.isPartialMode ? paymentHook.paidSoFar : null,
+                remaining: paymentHook.isPartialMode ? totals.remainingDebt : null
+            }
         });
-        setTimeout(() => window.print(), 100);
     };
 
     const handleCheckout = async () => {
-        if (cart.length === 0) return;
-        setProcessing(true);
-        const user = auth.currentUser;
-        const subMethodDisplay = paymentMethod === 'cash' ? 'Nakit' : `Kart (${cardBank.toUpperCase()})`;
-        const transMethod = paymentMethod === 'cash' ? 'cash' : 'card';
-        const transCardBank = paymentMethod === 'card' ? cardBank : null;
+        if (cartHook.cart.length === 0) return;
 
-        const transactionData = {
-            date: new Date().toISOString().split('T')[0], type: 'income', amount: totalAmount,
-            desc: `POS Satış (${cart.length} Kalem)`, method: transMethod, cardBank: transCardBank, subMethod: subMethodDisplay, category: 'Satış',
-            items: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))
-        };
+        setProcessing(true);
 
         try {
-            // 👇 ORTAK HAVUZA EKLEME
-            await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), transactionData);
-            
-            // Stoktan düşme (Eğer bu fonksiyonu güncellediyseniz o da çalışır)
-            // await deductStockForTransaction(cart); // Şimdilik kapalı, stok modülünü henüz ortak havuza almadık.
+            // 🔥 KRİTİK HESAPLAMA: İndirim tutarını puana geri çeviriyoruz (1 TL = 2 Puan)
+            const pointsSpentVal = loyaltyDiscount / 0.5;
 
-            setSuccessMsg(`✅ ${formatCurrency(totalAmount)} ₺ Tahsil Edildi!`);
-            setCart([]);
-            setPaymentMethod('cash');
-            setCardBank('ziraat');
-            setTimeout(() => setSuccessMsg(''), 3000);
-        } catch (error) { console.error("Satış hatası:", error); alert("Satış kaydedilirken hata oluştu."); } finally { setProcessing(false); }
+            const transactionData = {
+                amount: currentPayable,      // 195 TL
+                total: totals.subTotal,      // 200 TL
+                loyaltyDiscount: loyaltyDiscount, // 5 TL
+                pointsSpent: pointsSpentVal, // ✨ HARCANAN PUAN (Örn: 10 M-Coin)
+                method: paymentHook.paymentMethod,
+                cardBank: paymentHook.cardBank,
+                type: 'income',
+                desc: 'POS Satışı',
+                date: new Date().toISOString().split('T')[0] //
+            };
+
+            // 1. İşlemi Kaydet ve Puanları Güncelle
+            const result = await transactionsHook.saveTransaction(transactionData, loyaltyHook.loyaltyCustomer);
+
+            if (result.success) {
+                playCashSound();
+                setSuccessMsg(`₺${formatCurrency(currentPayable)} Tahsil Edildi`);
+
+                // 🔥 KRİTİK: İndirim Rozetini ve Puan State'ini SIFIRLA
+                setLoyaltyDiscount(0);
+                paymentHook.setCustomTotal('');
+
+                // 2. Sepeti Temizle
+                cartHook.setCart([]);
+                paymentHook.resetPayment();
+
+                // 3. Müşteri Seçimini Kapat (Badge'in gitmesi için)
+                loyaltyHook.resetCustomer();
+
+                setTimeout(() => setSuccessMsg(''), 3000);
+            }
+        } catch (error) {
+            console.error("Ödeme Hatası:", error);
+        } finally {
+            setProcessing(false);
+        }
     };
 
-    const categories = ['Tümü', ...new Set(products.map(p => p.category))];
-    const filteredProducts = products.filter(p => (selectedCategory === 'Tümü' || p.category === selectedCategory) && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const handleLoyaltyRedeemPoints = (discountValue, pointsUsed) => {
+        const newTotal = Math.max(0, totals.subTotal - discountValue);
 
+        paymentHook.setCustomTotal(newTotal.toString());
+        paymentHook.setIsPartialMode(false);
+        paymentHook.setDiscountRate(0);
+        setLoyaltyDiscount(discountValue); // Track applied discount
+
+        // Başarı mesajı göster
+        setSuccessMsg(`${pointsUsed} M-Coin kullanıldı! ${formatCurrency(discountValue)} ₺ indirim uygulandı.`);
+        setTimeout(() => setSuccessMsg(''), 3000);
+    };
+
+    const handleCancelLoyaltyDiscount = async () => {
+        if (loyaltyDiscount > 0 && loyaltyHook.loyaltyCustomer) {
+            // Kullanılan puanları geri yükle
+            const pointsToRestore = Math.round(loyaltyDiscount / 0.5); // 0.5 TL = 1 puan
+
+            try {
+                await loyaltyHook.restorePoints(pointsToRestore);
+                setSuccessMsg(`${pointsToRestore} M-Coin geri yüklendi!`);
+            } catch (error) {
+                console.error('Puan geri yükleme hatası:', error);
+                setSuccessMsg('İndirim iptal edildi (puan geri yüklenemedi).');
+            }
+        }
+
+        // Ödeme ayarlarını sıfırla
+        paymentHook.setCustomTotal('');
+        paymentHook.setDiscountRate(0);
+        setLoyaltyDiscount(0);
+
+        if (!loyaltyDiscount > 0) {
+            setSuccessMsg('M-Coin indirimi iptal edildi.');
+        }
+        setTimeout(() => setSuccessMsg(''), 3000);
+    };
+
+    // 🖨️ PRINT EFFECT
+    useEffect(() => {
+        if (printData && receiptRef.current) {
+            const timer = setTimeout(() => {
+                const printContent = receiptRef.current.innerHTML;
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write('<html><head><title>Adisyon</title><style>@import url("/index.css");</style></head><body>');
+                    printWindow.document.write(printContent);
+                    printWindow.document.write('</body></html>');
+                    printWindow.document.close();
+                    printWindow.print();
+                }
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [printData]);
+
+    // 📜 HISTORY EFFECT
+    useEffect(() => {
+        if (showHistoryModal) {
+            transactionsHook.fetchRecentTransactions();
+        }
+    }, [showHistoryModal]);
+
+    // 🎨 RENDER
     return (
-        <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-100px)] gap-6 overflow-visible lg:overflow-hidden pb-20 lg:pb-0">
-            {/* SOL: ÜRÜN LİSTESİ */}
-            <div className="flex-1 flex flex-col bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl h-[500px] lg:h-auto">
-                <div className="p-4 border-b border-slate-700 space-y-4 bg-slate-800/50">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20}/>
-                        <input type="text" placeholder="Ürün ara..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-xl pl-10 pr-4 py-3 text-white outline-none focus:border-indigo-500 transition-all"/>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                        {categories.map(cat => ( <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${selectedCategory === cat ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{cat}</button> ))}
-                    </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredProducts.map(product => (
-                            <button key={product.id} onClick={() => addToCart(product)} className="flex flex-col items-start p-4 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-indigo-500/50 rounded-2xl transition-all group active:scale-95 text-left h-32 justify-between">
-                                <span className="font-bold text-slate-200 line-clamp-2 group-hover:text-white transition-colors">{product.name}</span>
-                                <span className="text-emerald-400 font-bold bg-emerald-400/10 px-2 py-1 rounded-lg text-sm">{formatCurrency(product.price)} ₺</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
+        <div className={`relative w-full h-[calc(100vh-80px)] overflow-hidden font-sans flex lg:gap-4 transition-colors duration-500 ${isDarkMode ? 'bg-[#0F131C] text-slate-200' : 'bg-slate-100 text-slate-800'}`}>
+            
+            {/* PRODUCT OPTIONS MODAL */}
+            <ProductOptionsModal 
+                isOpen={!!productToCustomize}
+                onClose={() => setProductToCustomize(null)}
+                product={productToCustomize}
+                onConfirm={handleOptionConfirm}
+            />
 
-            {/* SAĞ: SEPET VE ÖDEME */}
-            <div className="w-full lg:w-[400px] bg-slate-800 rounded-2xl border border-slate-700 flex flex-col shadow-2xl shrink-0 h-auto">
-                <div className="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><ShoppingCart className="text-indigo-400"/> Sepet</h2>
-                    <span className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold">{cart.length} Ürün</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-slate-900/30 max-h-[300px] lg:max-h-full">
-                    {cart.length === 0 ? (
-                        <div className="h-40 lg:h-full flex flex-col items-center justify-center text-slate-500 opacity-60">
-                            <Coffee size={48} className="mb-2"/>
-                            <p>Sepet boş</p>
-                        </div>
-                    ) : (
-                        cart.map(item => (
-                            <div key={item.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-xl border border-slate-700 group">
-                                <div className="flex-1 min-w-0 mr-3">
-                                    <h4 className="font-bold text-slate-200 text-sm truncate">{item.name}</h4>
-                                    <p className="text-xs text-indigo-400 font-bold">{formatCurrency(item.price * item.quantity)} ₺</p>
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-900 rounded-lg p-1">
-                                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded"><Minus size={14}/></button>
-                                    <span className="w-6 text-center text-sm font-bold text-white">{item.quantity}</span>
-                                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded"><Plus size={14}/></button>
-                                </div>
-                                <button onClick={() => removeFromCart(item.id)} className="ml-2 text-slate-600 hover:text-red-500 p-2"><Trash2 size={16}/></button>
-                            </div>
-                        ))
-                    )}
-                </div>
-                <div className="p-5 bg-slate-900 border-t border-slate-800 space-y-4">
-                    <div className="flex justify-between items-end"><span className="text-slate-400 text-sm font-medium">Toplam Tutar</span><span className="text-3xl font-black text-white tracking-tight">{formatCurrency(totalAmount)} <span className="text-lg text-slate-600 font-medium">₺</span></span></div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => setPaymentMethod('cash')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all border-2 ${paymentMethod === 'cash' ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}`}><Banknote size={24}/> <span className="text-xs">NAKİT</span></button>
-                        <button onClick={() => setPaymentMethod('card')} className={`py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all border-2 ${paymentMethod === 'card' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}`}><CreditCard size={24}/> <span className="text-xs">KART</span></button>
-                    </div>
-                    {paymentMethod === 'card' && ( <div className="grid grid-cols-3 gap-2 animate-in slide-in-from-top-2 fade-in">{bankOptions.map(option => ( <button key={option.key} onClick={() => setCardBank(option.key)} className={`py-2 rounded-lg text-[10px] font-bold transition-colors border ${cardBank === option.key ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>{option.label}</button> ))}</div> )}
-                    <button onClick={handlePrintReceipt} disabled={cart.length === 0} className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-slate-600"><Printer size={20}/> ADİSYON YAZDIR</button>
-                    <button onClick={handleCheckout} disabled={cart.length === 0 || processing} className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${successMsg ? 'bg-emerald-500 text-white' : (paymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white')}`}>{successMsg ? <><CheckCircle2/> {successMsg}</> : 'TAHSİL ET'}</button>
-                </div>
-                <Receipt data={printData} />
-            </div>
+            {/* CART PANEL */}
+            <CartPanel
+                cart={cartHook.cart}
+                isDarkMode={isDarkMode}
+                activeTab={activeTab}
+                isSelectionMode={cartHook.isSelectionMode}
+                isPartialMode={paymentHook.isPartialMode}
+                selectedItems={cartHook.selectedItems}
+                discountRate={paymentHook.discountRate}
+                splitCount={paymentHook.splitCount}
+                customTotal={paymentHook.customTotal}
+                currentPayable={currentPayable}
+                paidSoFar={paymentHook.paidSoFar}
+                remainingDebt={totals.remainingDebt}
+                discountAmount={totals.discountAmount}
+                showLoyaltyModal={loyaltyHook.showLoyaltyModal}
+                loyaltyCustomer={loyaltyHook.loyaltyCustomer}
+                loyaltyDiscount={loyaltyDiscount}
+                onCancelLoyaltyDiscount={handleCancelLoyaltyDiscount}
+                showChangeModal={showChangeModal}
+                showHistoryModal={showHistoryModal}
+                showHeldOrdersModal={showHeldOrdersModal}
+                onUpdateQuantity={cartHook.updateQuantity}
+                onToggleSelection={cartHook.toggleSelection}
+                onRemoveFromCart={cartHook.removeFromCart}
+                onCloseTab={() => setActiveTab('menu')}
+                onLoyaltyClick={loyaltyHook.openLoyaltyModal}
+                onDiscountClick={paymentHook.cycleDiscountRate}
+                onRoundClick={() => {
+                    paymentHook.setCustomTotal('');
+                    setShowManualModal(true);
+                }}
+                onChangeClick={() => setShowChangeModal(true)}
+                onHoldClick={() => {
+                    if(cartHook.cart.length > 0) handleHoldOrder();
+                    else setShowHeldOrdersModal(true);
+                }}
+                onHistoryClick={() => setShowHistoryModal(true)}
+                onClearCart={() => {
+                    cartHook.clearCart();
+                    paymentHook.resetPayment();
+                    paymentHook.disablePartialMode();
+                }}
+                onSelectionToggle={cartHook.toggleSelectionMode}
+                onPartialClick={() => {
+                    paymentHook.setCustomTotal('');
+                    setShowPartialModal(true);
+                }}
+                onSplitClick={paymentHook.cycleSplitCount}
+                onCloseSummary={() => {
+                    if (paymentHook.isPartialMode) {
+                        paymentHook.disablePartialMode();
+                    } else if (cartHook.isSelectionMode) {
+                        cartHook.toggleSelectionMode();
+                    }
+                }}
+            >
+                {/* PAYMENT SECTION PLACEHOLDER */}
+                <PaymentSection 
+                    isDarkMode={isDarkMode}
+                    paymentMethod={paymentHook.paymentMethod}
+                    cardBank={paymentHook.cardBank}
+                    receivedAmount={paymentHook.receivedAmount}
+                    currentPayable={currentPayable}
+                    processing={processing}
+                    successMsg={successMsg}
+                    cartLength={cartHook.cart.length}
+                    isSelectionMode={cartHook.isSelectionMode}
+                    subTotal={totals.subTotal}
+                    activeBankStyle={activeBankStyle}
+                    loyaltyCustomer={loyaltyHook.loyaltyCustomer}
+                    loyaltyHook={loyaltyHook}
+                    onRedeemPoints={handleLoyaltyRedeemPoints}
+                    onMethodChange={paymentHook.setPaymentMethod}
+                    onBankChange={paymentHook.setCardBank}
+                    onClearReceived={() => paymentHook.setReceivedAmount('')}
+                    onPrint={handlePrintReceipt}
+                    onCheckout={handleCheckout}
+                    showChangeModal={showChangeModal}
+                    showManualModal={showManualModal}
+                    showPartialModal={showPartialModal}
+                    showHistoryModal={showHistoryModal}
+                />
+            
+            </CartPanel>
+
+            {/* MENU PANEL */}
+            <MenuPanel 
+                isDarkMode={isDarkMode}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                searchTerm={searchTerm}
+                sortOption={sortOption}
+                isSortMenuOpen={isSortMenuOpen}
+                processedProducts={processedProducts}
+                activeTab={activeTab}
+                onThemeToggle={() => setIsDarkMode(!isDarkMode)}
+                onCategorySelect={setSelectedCategory}
+                onSearchChange={setSearchTerm}
+                onSortToggle={() => setIsSortMenuOpen(!isSortMenuOpen)}
+                onSortSelect={(option) => {
+                    setSortOption(option);
+                    setIsSortMenuOpen(false);
+                }}
+                onProductClick={handleProductClick}
+            />
+
+            {/* MODALS */}
+            <ChangeCalculatorModal 
+                isOpen={showChangeModal}
+                onClose={() => setShowChangeModal(false)}
+                currentPayable={currentPayable}
+                receivedAmount={paymentHook.receivedAmount}
+                onAmountChange={paymentHook.setReceivedAmount}
+            />
+
+            <RoundPriceModal 
+                isOpen={showManualModal}
+                onClose={() => setShowManualModal(false)}
+                subTotal={totals.subTotal}
+                customTotal={paymentHook.customTotal}
+                onCustomTotalChange={paymentHook.setCustomTotal}
+                onApply={() => paymentHook.setDiscountRate(0)}
+            />
+
+            <PartialPaymentModal 
+                isOpen={showPartialModal}
+                onClose={() => {
+                    setShowPartialModal(false);
+                    paymentHook.setCustomTotal('');
+                }}
+                finalTotal={totals.finalTotal}
+                paidSoFar={paymentHook.paidSoFar}
+                customTotal={paymentHook.customTotal}
+                discountRate={paymentHook.discountRate}
+                onCustomTotalChange={paymentHook.setCustomTotal}
+                onDiscountToggle={paymentHook.cycleDiscountRate}
+                onApply={() => {
+                    setShowPartialModal(false);
+                    paymentHook.enablePartialMode();
+                    paymentHook.setSplitCount(1);
+                }}
+            />
+
+            <HistoryModal 
+                isOpen={showHistoryModal}
+                onClose={() => setShowHistoryModal(false)}
+                transactions={transactionsHook.recentTransactions}
+                onVoidTransaction={transactionsHook.voidTransaction}
+            />
+
+            <HeldOrdersModal 
+                isOpen={showHeldOrdersModal}
+                onClose={() => setShowHeldOrdersModal(false)}
+                heldOrders={heldOrders}
+                onRestore={handleRestoreOrder}
+            />
+
+            <LoyaltyModal
+                isOpen={loyaltyHook.showLoyaltyModal}
+                onClose={loyaltyHook.closeLoyaltyModal}
+                loyaltyPhone={loyaltyHook.loyaltyPhone}
+                loyaltyCustomer={loyaltyHook.loyaltyCustomer}
+                processing={loyaltyHook.processing}
+                isDarkMode={isDarkMode}
+                onPhoneChange={loyaltyHook.setLoyaltyPhone}
+                onSearch={loyaltyHook.searchCustomer}
+                onResetCustomer={loyaltyHook.resetCustomer}
+                onNewCustomer={() => loyaltyHook.setShowRegisterModal(true)}
+                onRedeemPoints={(points) =>
+                    loyaltyHook.redeemPoints(points, handleLoyaltyRedeemPoints)
+                }
+            />
+
+            {/* Diğer modalların yanına ekleyin */}
+            <RegisterModal
+                isOpen={loyaltyHook.showRegisterModal}
+                onClose={() => loyaltyHook.setShowRegisterModal(false)}
+                phone={loyaltyHook.loyaltyPhone}
+                onRegister={loyaltyHook.registerCustomer}
+                isDarkMode={isDarkMode}
+            />
+
+            {/* Yeni Üye Onayı İçin */}
+            <ConfirmDialog
+                isOpen={loyaltyHook.showConfirmDialog}
+                title="Üye Bulunamadı"
+                message={`${loyaltyHook.loyaltyPhone} numaralı müşteri kayıtlı değil. Yeni profil oluşturulsun mu?`}
+                type="question"
+                isDarkMode={isDarkMode}
+                onCancel={() => loyaltyHook.setShowConfirmDialog(false)}
+                onConfirm={() => {
+                    loyaltyHook.setShowConfirmDialog(false);
+                    loyaltyHook.setShowRegisterModal(true);
+                }}
+            />
+
+            {/* MOBILE TAB BAR */}
+            <MobileTabBar
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                cartCount={totalItems}
+                isDarkMode={isDarkMode}
+                cartTotal={totals.finalTotal}
+            />
+
+            {/* RECEIPT */}
+            <Receipt data={printData} ref={receiptRef} />
         </div>
     );
 };

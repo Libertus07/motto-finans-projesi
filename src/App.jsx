@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { Loader2, Menu, MonitorCheck } from 'lucide-react'; 
+import { Loader2, Menu, MonitorCheck } from 'lucide-react';
+// 👇 YENİ: Navigate eklendi (Yönlendirme için)
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
 
-import { auth } from './services/firebase';
+import { db, appId, auth } from './services/firebase';
 import { THEME } from './utils/constants';
 
 import Sidebar from './components/Sidebar';
@@ -12,8 +15,9 @@ import AuthScreen from './components/AuthScreen';
 import useFinanceData from './hooks/useFinanceData';
 import InfoModal from './components/InfoModal';
 import MaintenancePage from './components/MaintenancePage';
-// 👇 YENİ: Premium Network Island Bileşeni
 import NetworkStatus from './components/NetworkStatus';
+
+import CustomerLoyalty from './pages/CustomerLoyalty';
 
 const MAINTENANCE_MODE = false;
 
@@ -33,8 +37,9 @@ const CashierSettings = lazy(() => import('./pages/CashierSettings'));
 const ZReport = lazy(() => import('./pages/ZReport'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Staff = lazy(() => import('./pages/Staff'));
+const CustomerDirectory = lazy(() => import('./pages/CustomerDirectory'));
 
-// ✨ ÖZEL YÜKLEME EKRANI BİLEŞENİ
+// Yükleme Ekranı
 const LoadingScreen = () => (
   <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
@@ -51,48 +56,40 @@ const LoadingScreen = () => (
   </div>
 );
 
-export default function PatronFinancePro() {
+// -----------------------------------------------------------------------------
+// 1. YÖNETİM PANELİ (Admin Dashboard)
+// -----------------------------------------------------------------------------
+function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
-  const [activeTab, setActiveTab] = useState('pos'); 
+  const [activeTab, setActiveTab] = useState('pos');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
   const [salaryNotification, setSalaryNotification] = useState({ isOpen: false, names: '' });
+  const [loyaltySettings, setLoyaltySettings] = useState({ welcomeBonus: 50, birthdayBonus: 100 });
+  const [customers, setCustomers] = useState([]);
 
-  // Verileri Hook'tan Çek
   const {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
-    stats, calculateFutureCashflow, getProfitabilityWarnings,
-    staff, categories, loading 
+    stats, calculateFutureCashflow,
+    staff, categories, loading
   } = useFinanceData(user); 
 
-  // Auth Dinleyicisi
   useEffect(() => {
-    const initAuth = async () => { 
-        try { await signInAnonymously(auth); } 
-        catch (e) { console.error("Giriş Hatası:", e); } 
-    };
+    const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error(e); } };
     initAuth();
-
-    const unsubAuth = onAuthStateChanged(auth, (currentUser) => { if (currentUser) setUser(currentUser); });
-
-    return () => {
-        unsubAuth();
-    };
+    return onAuthStateChanged(auth, (currentUser) => { if (currentUser) setUser(currentUser); });
   }, []);
 
-  // Rol Yönetimi
   useEffect(() => {
     if (userRole) {
         localStorage.setItem('motto_user_role', userRole);
-        if (activeTab === 'pos' && userRole === 'patron') setActiveTab('dashboard');
+        if (userRole === 'patron') setActiveTab('dashboard');
         if (userRole === 'kasiyer') setActiveTab('pos');
         if (userRole === 'garson') setActiveTab('tables');
     }
   }, [userRole]);
 
-  // Maaş Bildirimi
   useEffect(() => {
     if (userRole === 'patron' && staff.length > 0) {
         const today = new Date().getDate();
@@ -106,26 +103,74 @@ export default function PatronFinancePro() {
         }
     }
   }, [staff, userRole]);
+
+  // Sayfa yüklendiğinde ayarları Firebase'den çek
+  useEffect(() => {
+      const fetchLoyaltySettings = async () => {
+          try {
+              const docRef = doc(db, 'artifacts', appId, 'shops', 'motto_coffee_sube_01', 'settings', 'loyalty');
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                  setLoyaltySettings(docSnap.data());
+              }
+          } catch (error) {
+              console.error("Sadakat ayarları yükleme hatası:", error);
+          }
+      };
+      if (user) fetchLoyaltySettings();
+  }, [user]);
+
+  // Müşteri listesini çek
+  useEffect(() => {
+      const fetchCustomers = async () => {
+          try {
+              const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
+              const customersRef = collection(db, 'artifacts', appId, 'shops', 'motto_coffee_sube_01', 'customers');
+              const q = query(customersRef, orderBy("createdAt", "desc"));
+              const querySnapshot = await getDocs(q);
+
+              const customerList = querySnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+              }));
+              setCustomers(customerList);
+          } catch (error) {
+              console.error("Müşteriler yüklenirken hata:", error);
+          }
+      };
+      if (user) fetchCustomers();
+  }, [user]);
   
   if (MAINTENANCE_MODE) return <MaintenancePage />;
-  
   if (loading && userRole) return <LoadingScreen />;
-  
   if (!userRole) return <AuthScreen setUserRole={setUserRole} />;
 
   const renderContent = () => {
-    // Yetki Kontrolü
     if (userRole === 'kasiyer' || userRole === 'garson') {
         const allowed = userRole === 'garson' ? ['tables', 'products'] : ['pos', 'tables', 'transactions', 'debts', 'products', 'settings'];
         if (!allowed.includes(activeTab)) return <div className="flex h-full items-center justify-center text-slate-500">Bu alana erişim yetkiniz yok.</div>;
     }
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard stats={stats} transactions={transactions} monthlyGoal={monthlyGoal} calculateFutureCashflow={calculateFutureCashflow} getProfitabilityWarnings={() => getProfitabilityWarnings(products)} tables={tables}/>;
-      case 'pos': return <CashierPOS products={products} ingredients={ingredients} />; 
+      case 'dashboard':
+        return (
+            <Dashboard
+                stats={stats}
+                transactions={transactions}
+                monthlyGoal={monthlyGoal}
+                calculateFutureCashflow={calculateFutureCashflow}
+                tables={tables}
+                loyaltySettings={loyaltySettings} // ✨ Yeni: Ayarları gönder
+                customers={customers}           // ✨ Yeni: Müşteri listesini gönder (State olarak tanımlanmalı)
+                ingredients={ingredients}
+                products={products}
+            />
+        );
+      case 'pos': return <CashierPOS products={products} ingredients={ingredients} loyaltySettings={loyaltySettings} />; 
       case 'tables': return <Tables tables={tables} products={products} ingredients={ingredients} userRole={userRole} />;
       case 'transactions': return <Transactions transactions={transactions} quickActions={quickActions} isPatron={userRole === 'patron'}/>;
       case 'debts': return <Debts debts={debts} stats={stats} />;
+      case 'customerDirectory': return <CustomerDirectory isDarkMode={true} />;
       case 'products': return <Products products={products} categories={categories} isPatron={userRole === 'patron'} canEdit={userRole !== 'garson'} userRole={userRole} />;
       case 'inventory': return <Inventory ingredients={ingredients} debts={debts} />;
       case 'recipe': return <Recipe ingredients={ingredients} products={products} />;
@@ -134,25 +179,17 @@ export default function PatronFinancePro() {
       case 'assistant': return <Assistant stats={stats} />;
       case 'staff': return <Staff staff={staff} />;
       case 'zreport': return <ZReport transactions={transactions} />;
-      case 'settings': return userRole === 'patron' ? <Settings monthlyGoal={monthlyGoal} setMonthlyGoal={setMonthlyGoal} fixedCosts={fixedCosts} setFixedCosts={setFixedCosts} /> : <CashierSettings />;
+      case 'settings': return userRole === 'patron' ? <Settings monthlyGoal={monthlyGoal} setMonthlyGoal={setMonthlyGoal} fixedCosts={fixedCosts} setFixedCosts={setFixedCosts} loyaltySettings={loyaltySettings} setLoyaltySettings={setLoyaltySettings} /> : <CashierSettings />;
       default: return <div className="text-center py-20 text-slate-500">Sayfa Bulunamadı</div>;
     }
   };
 
   return (
     <div className={`min-h-screen ${THEME.bg} text-slate-200 font-sans flex`}>
-      
-      {/* 👇 YENİ: Profesyonel Çevrimdışı Bildirimi (Dynamic Island) */}
       <NetworkStatus />
-
-      {/* Mobil Menü Butonu */}
       <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-800/90 backdrop-blur-md rounded-xl text-white shadow-lg border border-slate-700 active:scale-95 transition-transform"><Menu size={24} /></button>
-      
-      {/* Mobil Menü Overlay */}
       {isMobileMenuOpen && <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm md:hidden animate-in fade-in duration-200" onClick={() => setIsMobileMenuOpen(false)}></div>}
-      
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isMobile={!isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} userRole={userRole} />
-
       <main className={`flex-1 h-screen overflow-y-auto w-full relative ${isMobileMenuOpen ? 'overflow-hidden' : ''}`}>
         <div className="p-4 md:p-6 lg:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto">
           <Suspense fallback={<div className="flex flex-col items-center justify-center h-64 text-indigo-400 gap-3"><Loader2 className="animate-spin" size={32}/><span className="text-xs font-medium uppercase tracking-wider opacity-70">Sayfa Yükleniyor...</span></div>}>
@@ -160,8 +197,27 @@ export default function PatronFinancePro() {
           </Suspense>
         </div>
       </main>
-
       <InfoModal isOpen={salaryNotification.isOpen} onClose={() => setSalaryNotification({ ...salaryNotification, isOpen: false })} type="info" title="🔔 Maaş Günü" message={`Bugün maaş günü:\n\n${salaryNotification.names}`} />
     </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// 2. ANA UYGULAMA & ROTALAMA (ROUTING)
+// -----------------------------------------------------------------------------
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* 🟢 Müşteri Sadakat Ekranı: /plus */}
+        <Route path="/plus" element={<CustomerLoyalty />} />
+
+        {/* 🔴 Yönetim Paneli: /pos ile başlar */}
+        <Route path="/pos/*" element={<AdminDashboard />} />
+
+        {/* ↩️ Ana Sayfa ('/') otomatik olarak '/pos'a yönlenir */}
+        <Route path="/" element={<Navigate to="/pos" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
