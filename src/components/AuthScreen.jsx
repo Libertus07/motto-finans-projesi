@@ -101,7 +101,7 @@ const AuthScreen = ({ setUserRole }) => {
             if (rememberMe) localStorage.setItem('motto_saved_email', email);
             else localStorage.removeItem('motto_saved_email');
             setUserRole('patron');
-        } catch (err) { setError('Giriş başarısız.'); setLoading(false); }
+        } catch { setError('Giriş başarısız.'); setLoading(false); }
     };
 
     const handleForgotPassword = async (e) => {
@@ -109,7 +109,7 @@ const AuthScreen = ({ setUserRole }) => {
         if (!email) return setError('E-posta giriniz.');
         setLoading(true);
         try { await sendPasswordResetEmail(auth, email); setSuccessMsg('Link gönderildi.'); setError(''); } 
-        catch (err) { setError('İşlem başarısız.'); } finally { setLoading(false); }
+        catch { setError('İşlem başarısız.'); } finally { setLoading(false); }
     };
 
     return (
@@ -190,10 +190,23 @@ const AuthScreen = ({ setUserRole }) => {
                             {selectedRole.id === 'patron' && step !== 'forgot' && (
                                 <form onSubmit={handleAdminLogin} className="space-y-4">
                                     <div className="space-y-3">
-                                        <input type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3.5 px-4 text-sm text-white focus:border-amber-500 outline-none transition-colors placeholder:text-slate-600"/>
-                                        <input type="password" placeholder="Parola" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3.5 px-4 text-sm text-white focus:border-amber-500 outline-none transition-colors placeholder:text-slate-600"/>
+                                        <input aria-label="E-posta" type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3.5 px-4 text-sm text-white focus:border-amber-500 outline-none transition-colors placeholder:text-slate-600"/>
+                                        <input aria-label="Parola" type="password" placeholder="Parola" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3.5 px-4 text-sm text-white focus:border-amber-500 outline-none transition-colors placeholder:text-slate-600"/>
                                     </div>
-                                    <div className="flex items-center gap-2 py-1" onClick={() => setRememberMe(!rememberMe)}>
+                                    <div
+                                        className="flex items-center gap-2 py-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500/50 rounded-lg outline-none"
+                                        onClick={() => setRememberMe(!rememberMe)}
+                                        role="checkbox"
+                                        aria-checked={rememberMe}
+                                        aria-label="Beni Hatırla"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setRememberMe(!rememberMe);
+                                            }
+                                        }}
+                                    >
                                         <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${rememberMe ? 'bg-amber-500 border-amber-500' : 'bg-transparent border-slate-600'}`}>
                                             {rememberMe && <ArrowRight size={10} className="text-black rotate-[-45deg]" />}
                                         </div>
@@ -248,6 +261,7 @@ const AuthScreen = ({ setUserRole }) => {
                                         <div className="col-start-3">
                                             <button 
                                                 onClick={handleDelete}
+                                                aria-label="Sil"
                                                 className="w-full h-16 rounded-2xl bg-red-500/10 text-red-400 border border-red-500/20 active:scale-90 active:bg-red-500/20 transition-transform duration-75 flex items-center justify-center shadow-lg touch-manipulation select-none"
                                             >
                                                 <Delete size={22} />
