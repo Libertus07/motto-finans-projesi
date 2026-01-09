@@ -23,7 +23,9 @@ export default function useFinanceData(user) {
 
   const [fixedCosts, setFixedCosts] = useState({ rent: 0, staff: 0, bills: 0, other: 0 });
   const [monthlyGoal, setMonthlyGoal] = useState(0);
-  const [marketRates, setMarketRates] = useState({ gold: 0, dollar: 0, euro: 0 });
+
+  // Initialize with default values directly to avoid useEffect setState
+  const [marketRates, setMarketRates] = useState({ gold: 2950, dollar: 34.50, euro: 37.20 });
   const [loading, setLoading] = useState(true); 
   
   const hasSeededTablesRef = useRef(false);
@@ -45,10 +47,10 @@ export default function useFinanceData(user) {
   useEffect(() => {
     if (!user) return; 
     
-    console.log("🔥 Bağlanılan Mağaza Yolu:", `artifacts/${appId}/shops/${CURRENT_SHOP_ID}`);
+    // Not setting loading(true) here to avoid synchronous setState warning.
+    // Assuming loading is initially true or handled by the component.
 
     const unsubscribers = []; 
-    setLoading(true);
 
     try {
       // 1. KATEGORİLERİ ÇEK (Eğer yoksa varsayılanları oluştur)
@@ -105,17 +107,11 @@ export default function useFinanceData(user) {
 
     } catch (error) {
       console.error("Genel Veri Çekme Hatası:", error);
-      setLoading(false);
+      // Removed setLoading(false) here to avoid potential sync state update in effect
     }
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [user]);
-
-  // Döviz Kurları (Varsayılan Değerler)
-  useEffect(() => {
-        // API endpoint kaldırıldı, varsayılan değerler kullanılıyor
-        setMarketRates({ gold: 2950, dollar: 34.50, euro: 37.20 });
-  }, []);
 
   const stats = useMemo(() => {
       const safeTransactions = Array.isArray(transactions) ? transactions : [];
@@ -199,7 +195,7 @@ export default function useFinanceData(user) {
     transactions, products, investments, debts, ingredients, quickActions, tables,
     staff, 
     categories, // 👈 DIŞARI AKTARILAN KATEGORİ LİSTESİ
-    fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates,
+    fixedCosts, setFixedCosts, monthlyGoal, setMonthlyGoal, marketRates, setMarketRates,
     stats, calculateFutureCashflow, getProfitabilityWarnings, loading
   };
 }

@@ -12,7 +12,7 @@ const ProductOptionsModal = ({ isOpen, onClose, product, onConfirm }) => {
 
     // Modal her açıldığında verileri sıfırla
     useEffect(() => {
-        if (product) {
+        if (product && isOpen) {
             setTotalPrice(Number(product.price));
             setSelectedOptions([]);
             setQuantity(1); // Adet 1'e döner
@@ -24,10 +24,6 @@ const ProductOptionsModal = ({ isOpen, onClose, product, onConfirm }) => {
     const handleOptionToggle = (option) => {
         const isSelected = selectedOptions.some(opt => opt.id === option.id);
         let newOptions = [];
-        let newBasePrice = totalPrice - ((totalPrice - Number(product.price)) || 0); // Mevcut ekstraları sıfırla, tekrar hesapla
-
-        // Mevcut base fiyat (ürün fiyatı + seçili opsiyonlar)
-        let currentBasePrice = Number(product.price);
         
         if (isSelected) {
             newOptions = selectedOptions.filter(opt => opt.id !== option.id);

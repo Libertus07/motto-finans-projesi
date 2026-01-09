@@ -13,6 +13,9 @@ const LiquidationModal = ({ isOpen, onClose, investment, onConfirm, loading }) =
         if (isOpen && investment) {
             setQty(investment.quantity); // Varsayılan olarak hepsini sat
             setPrice(investment.currentPrice || investment.buyPrice); // Varsayılan güncel fiyat
+        } else if (!isOpen) {
+            setQty('');
+            setPrice('');
         }
     }, [isOpen, investment]);
 

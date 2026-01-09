@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Users, UserPlus, DollarSign, Wallet, Trash2, Save, X, Clock, CreditCard, Banknote, Calendar, CheckCircle2 } from 'lucide-react';
 import { addDoc, doc, updateDoc, deleteDoc, collection, arrayUnion } from 'firebase/firestore'; 
-import { db, appId, auth } from '../services/firebase';
+import { db, appId } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import ConfirmationModal from '../components/ConfirmationModal';
 import InfoModal from '../components/InfoModal';

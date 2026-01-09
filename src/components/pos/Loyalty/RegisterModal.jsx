@@ -1,5 +1,5 @@
 // components/pos/Loyalty/RegisterModal.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, User, UserPlus, ShieldCheck, Phone, Calendar } from 'lucide-react';
 
 const RegisterModal = ({ isOpen, onClose, phone: initialPhone, onRegister, isDarkMode }) => {
@@ -9,15 +9,15 @@ const RegisterModal = ({ isOpen, onClose, phone: initialPhone, onRegister, isDar
     const [phoneNumber, setPhoneNumber] = useState('');
     const [birthday, setBirthday] = useState('');
 
-    const initializedRef = useRef(false);
-
     // Modal açıldığında LoyaltyModal'dan gelen numarayı set et
     useEffect(() => {
-        if (isOpen && !initializedRef.current) {
+        if (isOpen) {
             setPhoneNumber(initialPhone || '');
-            initializedRef.current = true;
-        } else if (!isOpen) {
-            initializedRef.current = false;
+        } else {
+            // Modal kapandığında state'i temizle
+            setName('');
+            setSurname('');
+            setBirthday('');
         }
     }, [isOpen, initialPhone]);
 

@@ -9,7 +9,9 @@ const TableTransferModal = ({ isOpen, onClose, tables, selectedTableId, onConfir
     
     // Modal açıldığında state'i sıfırla
     useEffect(() => {
-        if (isOpen) setTargetTableId('');
+        if (!isOpen) {
+            setTargetTableId('');
+        }
     }, [isOpen]);
 
     if (!isOpen) return null;

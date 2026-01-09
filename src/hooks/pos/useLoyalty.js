@@ -8,9 +8,9 @@ import { getLocalISODate } from '../../utils/pos/calculations';
 export const useLoyalty = () => {
     const [loyaltyCustomer, setLoyaltyCustomer] = useState(null);
     const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
-    const [showRegisterModal, setShowRegisterModal] = useState(false); // ✨ Yeni: Kayıt modalı durumu
-    const [showConfirmDialog, setShowConfirmDialog] = useState(false); // Onay dialog durumu
-    const [pendingPhone, setPendingPhone] = useState(''); // Onay bekleyen telefon
+    const [showRegisterModal, setShowRegisterModal] = useState(false);
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [pendingPhone, setPendingPhone] = useState('');
     const [loyaltyPhone, setLoyaltyPhone] = useState('');
     const [processing, setProcessing] = useState(false);
 
@@ -29,8 +29,6 @@ export const useLoyalty = () => {
         setLoyaltyPhone('');
         setShowLoyaltyModal(false);
     }, []);
-
-
 
     const searchCustomer = useCallback(async (phone) => {
         if (!phone) return;
@@ -78,7 +76,7 @@ export const useLoyalty = () => {
         } finally {
             setProcessing(false);
         }
-    }, [appId]);
+    }, []); // Removed appId from dependencies
 
     // Puan harca
     const redeemPoints = useCallback(async (points, onApplyDiscount) => {
