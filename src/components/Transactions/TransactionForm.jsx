@@ -140,7 +140,7 @@ const TransactionForm = ({
                                     d.setDate(d.getDate() - 1);
                                     setNewTrans({...newTrans, date: d.toISOString().split('T')[0]});
                                 }}
-                                className="w-full py-4 text-[10px] font-black text-indigo-400 bg-indigo-500/5 border border-indigo-500/20 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all"
+                                className="w-full py-3 text-[9px] font-black text-indigo-400 bg-indigo-500/5 border border-indigo-500/20 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all"
                             >
                                 DÜN OLARAK AYARLA
                             </button>
