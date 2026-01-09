@@ -1,0 +1,4 @@
+## 2025-10-26 - Hardcoded Firebase Credentials in Fallback Config
+**Vulnerability:** The `src/services/firebase.js` file contained a `FALLBACK_CONFIG_RAW` object with hardcoded Firebase API keys and project configuration. This was intended as a fallback if environment variables were missing.
+**Learning:** Developers often add fallback configurations for convenience during local development, but this practice risks exposing secrets if the code is committed. It also bypasses environment-based configuration management.
+**Prevention:** Always enforce strict environment variable checks. If required variables are missing, the application should fail fast and securely (e.g., throw an error) rather than silently using insecure hardcoded defaults. Never commit "fallback" secrets to source control.
