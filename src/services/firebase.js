@@ -11,33 +11,21 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Yapılandırma
-const FALLBACK_CONFIG_RAW = {
-    apiKey: "AIzaSyC7dD3PwBEsaGyYLEG6wUqccMgY8IH4kmM", 
-    authDomain: "mottocoffee-app.firebaseapp.com",
-    projectId: "mottocoffee-app",
-    storageBucket: "mottocoffee-app.appspot.com",
-    messagingSenderId: "1234567890",
-    appId: "1:1234567890:web:abcde12345",
-};
-
 const API_KEY_ENV = import.meta.env.VITE_FIREBASE_API_KEY;
 const APP_ID_ENV = import.meta.env.VITE_FIREBASE_APP_ID;
 
-let config;
-
-if (API_KEY_ENV && APP_ID_ENV) {
-    config = {
-        apiKey: API_KEY_ENV,
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-        appId: APP_ID_ENV,
-    };
-} else {
-    config = FALLBACK_CONFIG_RAW;
+if (!API_KEY_ENV || !APP_ID_ENV) {
+    throw new Error("❌ Kritik Hata: Firebase ortam değişkenleri eksik! Lütfen .env dosyasını kontrol edin.");
 }
+
+const config = {
+    apiKey: API_KEY_ENV,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: APP_ID_ENV,
+};
 
 const cleanedApiKey = String(config.apiKey).replace(/["',]/g, '').trim();
 const finalConfig = { ...config, apiKey: cleanedApiKey };

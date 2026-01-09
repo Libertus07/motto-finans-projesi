@@ -2,7 +2,7 @@
 
 // ✅ DÜZELTME: Gemini API Key artık .env'den VITE_ önekiyle çekiliyor.
 export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "API Anahtarı Yüklenemedi";
-export const ADMIN_PASSWORD = 'Motto1786';
+export const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "ADMIN_PASSWORD_NOT_SET";
 
 // 👇 BURASI EKLENDİ: Tüm kullanıcıların ortak bağlanacağı dükkan kimliği
 export const SHOP_ID = 'motto_coffee_sube_01'; 
