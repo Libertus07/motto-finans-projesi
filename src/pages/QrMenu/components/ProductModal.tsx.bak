@@ -1,0 +1,58 @@
+import React, { useState } from 'react';
+import { X } from 'lucide-react';
+import { Product } from '../../../types';
+import { getProductImage } from '../../../utils/imageHelpers';
+
+interface ProductModalProps {
+    product: Product | null;
+    onClose: () => void;
+    onAddToCart: (product: Product, options: any, e?: React.MouseEvent) => void;
+    t: (key: string) => string;
+}
+
+const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onAddToCart, t }) => {
+    const [productOptions, setProductOptions] = useState<{ size: string | null; extras: any[]; sugar: string | null; notes: string; }>({ size: 'medium', extras: [], sugar: 'normal', notes: '' });
+
+    if (!product) return null;
+
+    const handleAdd = (e: React.MouseEvent) => {
+        onAddToCart(product, productOptions, e);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-[#432818]/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-[#FDFBF7] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 relative" onClick={e => e.stopPropagation()}>
+                <div className="absolute top-[-50%] left-[-50%] right-[-50%] h-[500px] bg-gradient-radial from-[#D4AF37]/20 to-transparent pointer-events-none"></div>
+
+                {/* Product Image Header */}
+                <div className="h-72 bg-[#1a110d] relative flex items-center justify-center z-10 overflow-hidden">
+                    <img
+                        src={getProductImage(product)}
+                        alt={product.name}
+                        className="w-full h-full object-cover opacity-90 transition-transform duration-700 hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <button onClick={onClose} className="absolute top-4 right-4 w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/40 transition-colors z-20 shadow-lg border border-white/10"><X /></button>
+                </div>
+
+                <div className="p-6 relative z-10 bg-[#FDFBF7] rounded-t-3xl shadow-[0_-20px_40px_rgba(253,251,247,1)] mt-[-20px]">
+                    <div className="flex justify-between items-start mb-2">
+                        <h2 className="text-3xl font-black text-[#432818] font-cinzel leading-none">{product.name}</h2>
+                        <span className="text-3xl font-black text-[#D4AF37] font-cinzel">{product.price} ₺</span>
+                    </div>
+                    <p className="text-[#432818]/70 text-sm mb-6 leading-relaxed">{product.description}</p>
+                    <div className="mb-6">
+                        <label className="text-xs font-bold text-[#432818] uppercase font-cinzel">{t('special_note')}</label>
+                        <textarea value={productOptions.notes} onChange={e => setProductOptions({ ...productOptions, notes: e.target.value })} className="w-full p-4 mt-2 bg-white border border-[#432818]/10 rounded-xl outline-none text-[#432818] shadow-sm focus:border-[#D4AF37]" placeholder={t('note_placeholder')} rows={3} />
+                    </div>
+                    <button onClick={handleAdd} className="w-full bg-[#432818] text-[#D4AF37] py-4 rounded-xl font-bold text-lg flex justify-between px-6 hover:shadow-lg shadow-[#D4AF37]/20 transition-all font-cinzel">
+                        <span>{t('add_to_cart')}</span>
+                        <span>{product.price} ₺</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default ProductModal;

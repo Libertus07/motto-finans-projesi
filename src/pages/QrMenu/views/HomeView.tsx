@@ -1,0 +1,319 @@
+import React from 'react';
+import { Plus, Clock, Leaf, Flame, Wheat, User, Bell } from 'lucide-react';
+import { Product } from '../../../types';
+import { CustomerProfile } from './qrMenu';
+import { getTodayString } from '../../../utils/helpers';
+import StoriesWidget from '../components/StoriesWidget';
+import VoltWidget from '../components/VoltWidget';
+import StampCard from '../components/StampCard';
+// New Feature Widgets
+import LiveTrends from '../components/LiveTrends';
+import JukeboxWidget from '../components/JukeboxWidget';
+import GuestbookWidget from '../components/GuestbookWidget';
+import { ChevronLeft, LayoutGrid } from 'lucide-react';
+import SkeletonLoader from '../components/SkeletonLoader';
+
+const categoryEmojiMap: Record<string, string> = {
+    'Kahveler': '☕',
+    'Soğuk İçecekler': '🥤',
+    'Tatlılar': '🍰',
+    'Atıştırmalıklar': '🥪',
+    'Çaylar': '🫖',
+    'Özel Karışımlar': '🧪',
+    'Kahvaltılıklar': '🥐',
+    'Sıcak İçecekler': '🔥'
+};
+
+interface HomeViewProps {
+    loading: boolean;
+    products: Product[];
+    categories: string[];
+    activeCategory: string | null;
+    favoriteProducts: Product[];
+    productsByCategory: Record<string, Product[]>;
+    isMember: boolean;
+    customerProfile: CustomerProfile | null;
+    onCategoryClick: (category: string) => void;
+    onProductClick: (product: Product) => void;
+    onWheelClick: () => void;
+    onOracleClick: () => void;
+    onTriviaClick: () => void;
+    onAuthClick: () => void;
+    onAccountClick: () => void;
+    onResetCategory: () => void;
+}
+
+const HomeView: React.FC<HomeViewProps> = ({
+    loading,
+    products,
+    categories,
+    activeCategory,
+    favoriteProducts,
+    productsByCategory,
+    isMember,
+    customerProfile,
+    onCategoryClick,
+    onProductClick,
+    onWheelClick,
+    onOracleClick,
+    onTriviaClick,
+    onAuthClick,
+    onAccountClick,
+    onResetCategory,
+}) => {
+    const renderDietLabels = (product: Product) => (
+        <div className="flex flex-col gap-1.5 absolute top-3 left-3 z-10">
+            {product.isVegan && (
+                <div className="bg-emerald-500/90 backdrop-blur-md text-white p-1.5 rounded-full shadow-lg ring-1 ring-white/20" title="Vegan">
+                    <Leaf size={10} fill="currentColor" />
+                </div>
+            )}
+            {product.isSpicy && (
+                <div className="bg-red-500/90 backdrop-blur-md text-white p-1.5 rounded-full shadow-lg ring-1 ring-white/20" title="Acı">
+                    <Flame size={10} fill="currentColor" />
+                </div>
+            )}
+            {product.isGlutenFree && (
+                <div className="bg-amber-500/90 backdrop-blur-md text-white p-1.5 rounded-full shadow-lg ring-1 ring-white/20" title="Glutensiz">
+                    <Wheat size={10} />
+                </div>
+            )}
+        </div>
+    );
+
+    // Yönetici Kontrolü ve Çark Durumu
+    const isUserAdmin = (customerProfile as any)?.role === 'admin' || (customerProfile as any)?.isAdmin === true;
+    const isWheelDisabled = isMember && customerProfile?.lastSpinDate === getTodayString() && !isUserAdmin;
+
+    if (loading) return <SkeletonLoader />;
+
+    if (products.length === 0) return (
+        <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center pb-32">
+            <div className="text-center p-8">
+                <div className="w-20 h-20 bg-[#432818]/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Clock size={40} className="text-[#432818]/20" />
+                </div>
+                <h2 className="text-2xl font-black text-[#432818] font-cinzel mb-2">Menü Hazırlanıyor</h2>
+                <p className="text-[#432818]/60 max-w-[200px] mx-auto text-sm">Lezzet dolu menümüz çok yakında burada olacak.</p>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="min-h-screen bg-[#FDFBF7] pb-32">
+            <div className="bg-[#FDFBF7]/95 backdrop-blur-md z-30 sticky top-0 transition-all border-b border-[#432818]/5 pb-0 shadow-sm">
+                <div className="p-4 pb-2">
+                    <div className="flex justify-between items-center mb-1">
+                        <div className="flex items-center gap-3">
+                            {activeCategory ? (
+                                <button
+                                    onClick={onResetCategory}
+                                    className="w-10 h-10 rounded-2xl bg-white text-[#432818] ring-1 ring-[#432818]/5 flex items-center justify-center active:scale-95 transition-all shadow-sm"
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+                            ) : null}
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-[#BB9457] uppercase tracking-[0.3em] font-cinzel leading-none mb-1">
+                                    {activeCategory || 'ROASTERY'}
+                                </span>
+                                <h1 className="text-2xl font-black text-[#432818] tracking-tight font-cinzel leading-none">
+                                    {activeCategory ? 'MENÜ' : 'MOTTO'}
+                                </h1>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={onWheelClick}
+                                title={isWheelDisabled ? "Kader Çarkı: Bir sonraki hakkınız yarın aktif olacak" : "Kader Çarkı: Şansını Dene!"}
+                                className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl active:scale-95 transition-all shadow-sm ring-1 ring-[#432818]/5 ${isWheelDisabled
+                                    ? 'bg-[#1a110d] text-[#D4AF37] opacity-60'
+                                    : 'bg-white text-[#432818] hover:bg-[#FDFBF7]'
+                                    }`}
+                            >
+                                {isWheelDisabled ? <Clock size={16} /> : '🎡'}
+                            </button>
+                            {!activeCategory && (
+                                <div className="flex items-center gap-3">
+                                    <button onClick={onOracleClick} className="w-10 h-10 rounded-2xl bg-white text-[#432818] ring-1 ring-[#432818]/5 flex items-center justify-center text-xl active:scale-95 transition-all shadow-sm">🔮</button>
+                                    <button onClick={onTriviaClick} className="w-10 h-10 rounded-2xl bg-white text-[#432818] ring-1 ring-[#432818]/5 flex items-center justify-center text-xl active:scale-95 transition-all shadow-sm">🧠</button>
+                                </div>
+                            )}
+                            <button
+                                onClick={isMember ? onAccountClick : onAuthClick}
+                                className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shadow-lg overflow-hidden relative active:scale-95 transition-transform ${isMember ? 'bg-[#432818] ring-2 ring-[#D4AF37] text-[#FDFBF7]' : 'bg-white text-[#432818] ring-1 ring-[#432818]/5'}`}
+                            >
+                                {isMember ? customerProfile?.firstName?.charAt(0) : <User size={20} />}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {!activeCategory && (
+                    <div className="px-4 pb-0 overflow-x-auto scrollbar-hide flex gap-8">
+                        {categories.map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => onCategoryClick(cat)}
+                                className={`pb-3 text-xs font-black whitespace-nowrap transition-all font-cinzel border-b-2 tracking-widest ${activeCategory === cat ? 'text-[#432818] border-[#432818] scale-110' : 'text-[#432818]/30 border-transparent opacity-60'}`}
+                            >
+                                {cat.toUpperCase()}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="pt-4">
+                {!activeCategory ? (
+                    <>
+                        <StoriesWidget />
+                        <div className="px-4 space-y-4 mt-2">
+                            <VoltWidget customerProfile={customerProfile} isMember={isMember} onOpenAuth={onAuthClick} />
+                            <StampCard isMember={isMember} customerProfile={customerProfile} onOpenAuth={onAuthClick} />
+                        </div>
+
+                        <div className="mt-10 px-4">
+                            <div className="flex items-end justify-between mb-6">
+                                <h2 className="text-xl font-black text-[#432818] font-cinzel leading-none uppercase tracking-tighter">Öne Çıkanlar</h2>
+                                <div className="h-px flex-1 bg-gradient-to-r from-[#432818]/10 to-transparent ml-4 mb-2"></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                {favoriteProducts.slice(0, 4).map(item => (
+                                    <div key={item.id} onClick={() => onProductClick(item)} className="group bg-white p-3 rounded-[2rem] shadow-xl shadow-[#432818]/5 border border-[#432818]/5 active:scale-95 transition-all flex flex-col h-full relative overflow-hidden">
+                                        {renderDietLabels(item)}
+                                        <div className="aspect-square bg-[#FDFBF7] rounded-[1.5rem] flex items-center justify-center text-5xl mb-4 relative group-hover:scale-105 transition-transform duration-500 overflow-hidden">
+                                            {item.image || '🔥'}
+                                            <div className="absolute bottom-2 inset-x-2 bg-[#432818]/80 backdrop-blur-md text-[#D4AF37] px-2 py-1 rounded-xl text-[8px] font-black tracking-[0.2em] shadow-sm font-cinzel text-center border ring-1 ring-white/10 uppercase">FAVORİ</div>
+                                        </div>
+                                        <h3 className="font-black text-[#432818] text-sm mb-1 leading-tight font-cinzel px-1 line-clamp-1">{item.name}</h3>
+                                        <div className="mt-auto flex justify-between items-center px-1 pt-2">
+                                            <span className="font-black text-[#432818] font-cinzel text-base tracking-tighter">{item.price} ₺</span>
+                                            <div className="w-8 h-8 bg-[#432818] text-[#D4AF37] rounded-xl flex items-center justify-center shadow-lg shadow-[#432818]/20 group-hover:rotate-90 transition-transform duration-300"><Plus size={16} /></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* CATEGORY GRID */}
+                            <div className="mt-12">
+                                <div className="flex items-end justify-between mb-8">
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <LayoutGrid size={14} className="text-[#BB9457]" />
+                                            <span className="text-[10px] font-black text-[#BB9457] uppercase tracking-[0.3em] font-cinzel">KEŞFET</span>
+                                        </div>
+                                        <h2 className="text-2xl font-black text-[#432818] font-cinzel leading-none uppercase tracking-tighter">Kategoriler</h2>
+                                    </div>
+                                    <div className="h-px flex-1 bg-gradient-to-r from-[#432818]/10 to-transparent ml-6 mb-2"></div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    {categories.map((cat) => (
+                                        <button
+                                            key={cat}
+                                            onClick={() => onCategoryClick(cat)}
+                                            className="group relative h-32 bg-white rounded-[2rem] border border-[#432818]/5 shadow-sm overflow-hidden active:scale-95 transition-all p-5 flex flex-col justify-between items-start text-left"
+                                        >
+                                            <div className="w-12 h-12 bg-[#F7F3F0] rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-500">
+                                                {categoryEmojiMap[cat] || '☕'}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-black text-[#432818] font-cinzel text-sm leading-none tracking-tight line-clamp-1">{cat.toUpperCase()}</h3>
+                                                <div className="flex items-center gap-1 mt-2 opacity-40 group-hover:opacity-100 transition-opacity">
+                                                    <span className="text-[9px] font-bold uppercase tracking-widest">{productsByCategory[cat]?.length || 0} ÜRÜN</span>
+                                                    <ChevronLeft size={10} className="rotate-180" />
+                                                </div>
+                                            </div>
+                                            {/* Decorative Background Icon */}
+                                            <div className="absolute -right-2 -bottom-2 text-6xl opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-125 transition-all duration-700 pointer-events-none -rotate-12">
+                                                {categoryEmojiMap[cat] || '☕'}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="flex items-center gap-3 mb-4 bg-[#FDFBF7]/90 backdrop-blur-md py-4 sticky top-[72px] z-20">
+                            <div className="w-12 h-12 bg-[#432818] rounded-2xl flex items-center justify-center text-2xl shadow-lg ring-4 ring-[#FDFBF7]">
+                                {categoryEmojiMap[activeCategory] || '☕'}
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-2xl font-black text-[#432818] font-cinzel leading-none tracking-tighter uppercase">{activeCategory}</h3>
+                                <p className="text-[10px] font-black text-[#BB9457] uppercase tracking-[0.2em] mt-1">{productsByCategory[activeCategory]?.length || 0} SEÇENEK</p>
+                            </div>
+                            <div className="h-px w-12 bg-gradient-to-r from-[#432818]/20 to-transparent"></div>
+                        </div>
+
+                        {/* QUICK CATEGORY SWITCHER */}
+                        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-6 sticky top-[148px] z-20 bg-[#FDFBF7]/90 backdrop-blur-md -mx-4 px-4">
+                            {categories.map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => onCategoryClick(cat)}
+                                    className={`px-4 py-2 rounded-xl text-[10px] font-black font-cinzel tracking-widest whitespace-nowrap transition-all flex items-center gap-2 border ${activeCategory === cat
+                                        ? 'bg-[#432818] text-[#D4AF37] border-[#432818] shadow-lg shadow-[#432818]/20 scale-105'
+                                        : 'bg-white text-[#432818]/60 border-[#432818]/5'
+                                        }`}
+                                >
+                                    <span>{categoryEmojiMap[cat] || '☕'}</span>
+                                    <span>{cat.toUpperCase()}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="grid gap-5">
+                            {productsByCategory[activeCategory]?.map(item => (
+                                <div key={item.id} onClick={() => onProductClick(item)} className="group bg-white p-4 rounded-3xl border border-[#432818]/5 shadow-sm flex gap-4 active:scale-[0.98] transition-all relative overflow-hidden">
+                                    {renderDietLabels(item)}
+                                    <div className="w-24 h-24 bg-[#FDFBF7] rounded-2xl flex items-center justify-center text-4xl shrink-0 relative group-hover:scale-110 transition-transform duration-500 overflow-hidden shadow-inner font-cinzel">
+                                        {item.image || '☕'}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent"></div>
+                                    </div>
+                                    <div className="flex-1 py-1 flex flex-col justify-between">
+                                        <div>
+                                            <h3 className="font-black text-[#432818] font-cinzel text-base leading-tight">{item.name}</h3>
+                                            <p className="text-[11px] font-medium text-[#432818]/50 line-clamp-2 mt-1 leading-relaxed">{item.description}</p>
+                                        </div>
+                                        <div className="flex justify-between items-end mt-3">
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] font-black text-[#BB9457] uppercase tracking-widest opacity-70">Fiyat</span>
+                                                <span className="font-black text-[#432818] text-xl font-cinzel leading-none tracking-tighter">{item.price} ₺</span>
+                                            </div>
+                                            <button className="bg-[#432818]/5 text-[#432818] w-10 h-10 rounded-2xl flex items-center justify-center border border-[#432818]/10 group-hover:bg-[#432818] group-hover:text-[#D4AF37] group-hover:shadow-lg group-hover:shadow-[#432818]/20 transition-all duration-300">
+                                                <Plus size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* --- EXPERIENCE SECTIONS (Navigated from HUB) --- */}
+            <div className="mt-20 space-y-8 pb-10">
+                <div id="live-trends">
+                    <LiveTrends />
+                </div>
+                <div id="jukebox-widget">
+                    <JukeboxWidget />
+                </div>
+                <div id="guestbook-widget">
+                    <GuestbookWidget />
+                </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center py-12 opacity-20 grayscale">
+                <p className="text-[10px] font-black font-cinzel tracking-widest">EST. 2023</p>
+            </div>
+        </div>
+    );
+};
+
+export default HomeView;

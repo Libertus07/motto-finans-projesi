@@ -1,0 +1,8 @@
+﻿src/components/pos/Modals/PartialPaymentModal.tsx(184,33): error TS1005: '}' expected.
+src/components/pos/Modals/PartialPaymentModal.tsx(185,81): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/pos/Modals/PartialPaymentModal.tsx(186,26): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/pos/Modals/PartialPaymentModal.tsx(187,21): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/pos/Modals/PartialPaymentModal.tsx(190,19): error TS17002: Expected corresponding JSX closing tag for 'div'.
+src/components/pos/Modals/PartialPaymentModal.tsx(199,9): error TS1005: ')' expected.
+src/components/pos/Modals/PartialPaymentModal.tsx(200,5): error TS1109: Expression expected.
+src/components/pos/Modals/PartialPaymentModal.tsx(201,1): error TS1128: Declaration or statement expected.

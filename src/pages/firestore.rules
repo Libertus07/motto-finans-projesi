@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 🛡️ YARDIMCI FONKSİYONLAR
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isNumeric(val) {
+      return val is int || val is float;
+    }
+
+    // 🏢 ANA VERİ YAPISI
+    match /artifacts/{appId}/shops/{shopId} {
+      
+      // 💰 İŞLEMLER (TRANSACTIONS)
+      // - Okuma: Herkes (Giriş yapmış)
+      // - Yazma: Sadece geçerli veri ile
+      // - Silme: YASAK (Denetim izi için)
+      // - Güncelleme: Sadece 'void' (iptal) durumuna izin ver
+      match /transactions/{transactionId} {
+        allow read: if isSignedIn();
+        
+        allow create: if isSignedIn() 
+                      && isNumeric(request.resource.data.amount)
+                      && request.resource.data.amount >= 0;
+                      
+        allow update: if isSignedIn() 
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'voidReason', 'voidTimestamp']);
+                      
+        allow delete: if false; 
+      }
+
+      // 👥 MÜŞTERİLER (CUSTOMERS)
+      match /customers/{phone} {
+        allow read, create, update: if isSignedIn();
+        // Not: İleride puan güncellemesi sadece Cloud Function üzerinden yapılmalı.
+      }
+
+      // 📦 DİĞER KOLEKSİYONLAR (Ürünler, Masalar vb.)
+      // Şimdilik esnek bırakıyoruz, operasyon aksamasın.
+      match /{collectionName}/{document=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+﻿src/components/Dashboard/OccupancyIndicator.tsx(46,44): error TS2322: Type '{ minAngle: number; background: { fill: string; }; clockWise: true; dataKey: string; cornerRadius: number; fill: string; }' is not assignable to type 'IntrinsicAttributes & Omit<PresentationAttributesAdaptChildEvent<any, SVGElement>, "ref"> & InternalRadialBarProps'.
+  Property 'minAngle' does not exist on type 'IntrinsicAttributes & Omit<PresentationAttributesAdaptChildEvent<any, SVGElement>, "ref"> & InternalRadialBarProps'.
+src/components/pos/Cart/CartItem.tsx(5,10): error TS2305: Module '"../../../types"' has no exported member 'CartItem'.
+src/components/pos/Cart/CartPanel.tsx(9,10): error TS2305: Module '"../../../types"' has no exported member 'CartItem'.
+src/components/pos/Modals/HistoryModal.tsx(60,68): error TS2339: Property 'timestamp' does not exist on type 'Transaction'.
+src/components/pos/Modals/HistoryModal.tsx(61,67): error TS2339: Property 'timestamp' does not exist on type 'Transaction'.
+src/components/pos/Modals/HistoryModal.tsx(66,58): error TS2339: Property 'paymentMethod' does not exist on type 'Transaction'.
+src/components/products/SortableProductItem.tsx(67,35): error TS2339: Property 'sold' does not exist on type 'Product'.
+src/components/products/SortableProductItem.tsx(69,42): error TS2339: Property 'sold' does not exist on type 'Product'.
+src/components/tables/OccupancyChart.tsx(86,90): error TS2322: Type '{ background: { fill: string; }; clockWise: true; dataKey: string; cornerRadius: number; }' is not assignable to type 'IntrinsicAttributes & Omit<PresentationAttributesAdaptChildEvent<any, SVGElement>, "ref"> & InternalRadialBarProps'.
+  Property 'clockWise' does not exist on type 'IntrinsicAttributes & Omit<PresentationAttributesAdaptChildEvent<any, SVGElement>, "ref"> & InternalRadialBarProps'.
+src/components/tables/ReservationModal.tsx(56,460): error TS2322: Type 'string' is not assignable to type 'number'.
+src/components/tables/TableCard.tsx(109,87): error TS2367: This comparison appears to be unintentional because the types '"occupied"' and '"empty"' have no overlap.
+src/hooks/pos/useFinanceStats.ts(26,35): error TS2367: This comparison appears to be unintentional because the types '"debt"' and '"payment"' have no overlap.
+src/hooks/pos/useTransactions.ts(45,28): error TS2352: Conversion of type '{ timestamp: any; id: string; }' to type 'Transaction' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ timestamp: any; id: string; }' is missing the following properties from type 'Transaction': date, type, amount, method
+src/pages/CashierPOS.tsx(219,28): error TS2339: Property 'name' does not exist on type '{ quantity: number; id: string; price: number; }'.
+src/pages/CashierPOS.tsx(222,28): error TS2339: Property 'note' does not exist on type '{ quantity: number; id: string; price: number; }'.
+src/pages/CashierPOS.tsx(266,13): error TS2365: Operator '>' cannot be applied to types 'boolean' and 'number'.
+src/pages/CashierPOS.tsx(336,14): error TS2741: Property 'onRedeemPoints' is missing in type '{ children: Element; cart: CartItem[]; isDarkMode: boolean; activeTab: string; isSelectionMode: boolean; isPartialMode: boolean; selectedItems: Record<string, number>; ... 28 more ...; onCloseSummary: () => void; }' but required in type 'CartPanelProps'.
+src/pages/CashierPOS.tsx(395,21): error TS2322: Type '"cash" | "card" | "iban"' is not assignable to type 'PaymentMethod'.
+  Type '"iban"' is not assignable to type 'PaymentMethod'.
+src/pages/CashierPOS.tsx(396,21): error TS2322: Type 'string' is not assignable to type 'BankName'.
+src/pages/CashierPOS.tsx(486,17): error TS2322: Type '(holdId: number) => void' is not assignable to type '(orderId: string) => void'.
+  Types of parameters 'holdId' and 'orderId' are incompatible.
+    Type 'string' is not assignable to type 'number'.
+src/pages/CustomerMenu.tsx(92,26): error TS2339: Property 'calories' does not exist on type 'Product'.
+src/pages/CustomerMenu.tsx(94,34): error TS2339: Property 'calories' does not exist on type 'Product'.
+src/pages/Debts.tsx(125,14): error TS2741: Property 'loading' is missing in type '{ isOpen: boolean; onClose: () => void; onConfirm: () => Promise<void>; title: string; message: string; type: string; }' but required in type '{ isOpen: any; onClose: any; onConfirm: any; title: any; message: any; type?: string; confirmText?: string; loading: any; }'.
+src/pages/Products.tsx(203,18): error TS2741: Property 'loading' is missing in type '{ isOpen: boolean; onClose: () => void; onConfirm: () => Promise<void>; title: string; message: string; type: string; confirmText: string; }' but required in type '{ isOpen: any; onClose: any; onConfirm: any; title: any; message: any; type?: string; confirmText?: string; loading: any; }'.
+src/pages/Products.tsx(265,100): error TS2339: Property 'sold' does not exist on type 'Product'.
+src/pages/Staff.tsx(247,14): error TS2741: Property 'loading' is missing in type '{ isOpen: boolean; onClose: () => void; onConfirm: () => Promise<void>; title: string; message: string; type: string; }' but required in type '{ isOpen: any; onClose: any; onConfirm: any; title: any; message: any; type?: string; confirmText?: string; loading: any; }'.
+src/pages/Staff.tsx(248,14): error TS2741: Property 'loading' is missing in type '{ isOpen: boolean; onClose: () => void; onConfirm: () => Promise<void>; title: string; message: string; type: string; confirmText: string; }' but required in type '{ isOpen: any; onClose: any; onConfirm: any; title: any; message: any; type?: string; confirmText?: string; loading: any; }'.
+src/pages/Staff.tsx(332,293): error TS2322: Type '{ type: string; label: string; color: string; id: number; amount: number; date: ISODateString; method?: string; transactionId?: string; }' is not assignable to type 'StaffFinanceItem'.
+  Types of property 'type' are incompatible.
+    Type 'string' is not assignable to type '"salary" | "advance"'.
+src/pages/Tables.tsx(326,441): error TS2339: Property 'sales' does not exist on type 'Product'.
+src/pages/Tables.tsx(326,458): error TS2339: Property 'sales' does not exist on type 'Product'.
+src/pages/Tables.tsx(337,14): error TS2741: Property 'loading' is missing in type '{ isOpen: boolean; onClose: () => void; onConfirm: () => Promise<string>; title: string; message: string; type: string; confirmText: string; }' but required in type '{ isOpen: any; onClose: any; onConfirm: any; title: any; message: any; type?: string; confirmText?: string; loading: any; }'.
+src/utils/constants.ts(4,51): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/utils/constants.ts(5,51): error TS2339: Property 'env' does not exist on type 'ImportMeta'.

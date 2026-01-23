@@ -7,15 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ☕ MOTTO COFFEE (Kurumsal Renkler)
+        // 🏛️ MOTTO GOLDEN AGE (Olimpos Teması)
         motto: {
-          50: '#faf6f1',   // En açık fon
-          100: '#F0E3D3',  // Latte/Krem (Verdiğin renk)
-          200: '#e6d5c0',
-          500: '#63432E',  // Espresso/Kahve (Ana renk - Verdiğin renk)
-          DEFAULT: '#63432E',
-          700: '#4d3424',
-          900: '#3d2b1f',  // Dark Roast
+          base: '#FDFBF7',    // Olimpos Kremi (Zemin)
+          dark: '#432818',    // Koyu Kahve (Logo Rengi - Yazılar)
+          light: '#BB9457',   // Açık Kahve (İkincil)
+          gold: '#D4AF37',    // Antik Altın (Şimşek/Vurgu)
+          red: '#99582A',     // Uyarı/İndirim (Sıcak Kiremit)
+          // Legacy mapping for compatibility
+          50: '#FDFBF7',
+          100: '#FDFBF7',
+          500: '#432818',
+          DEFAULT: '#432818',
         },
 
         // ✨ GOLD (Premium/M-Coin)
@@ -67,6 +70,21 @@ export default {
           800: '#1e293b',
           900: '#0f172a',
           950: '#020617',
+        }
+      },
+      fontFamily: {
+        titan: ['"Titan One"', 'sans-serif'],
+        cinzel: ['"Cinzel"', 'serif'],
+        sans: ['"Inter"', 'sans-serif'],
+      },
+      animation: {
+        'ping-slow': 'ping 3s cubic-bezier(0, 0, 0.2, 1) infinite',
+        'shimmer': 'shimmer 2s linear infinite',
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' }
         }
       }
     },
