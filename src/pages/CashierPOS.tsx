@@ -33,11 +33,11 @@ import { formatCurrency } from '../utils/helpers';
 import { bankOptions, BankOption } from '../utils/pos/themes';
 import { Product, BankName, HeldOrder, ReceiptData, CartItem } from '../types';
 
-interface CashierPOSProps {
-    products?: Product[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-const CashierPOS: React.FC<CashierPOSProps> = ({ products = [] }) => {
+const CashierPOS: React.FC = () => {
+    const { products } = useOutletContext<DashboardContextType>();
     // 🌗 CORE STATE
     const [isDarkMode, toggleTheme] = useTheme() as [boolean, () => void];
     const [selectedCategory, setSelectedCategory] = useState('Tümü');

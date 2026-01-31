@@ -15,14 +15,6 @@ import { Transaction, Product } from '../types';
 
 // --- Types ---
 
-interface StatProduct extends Product {
-    sold?: number;
-}
-
-interface StatsProps {
-    transactions: Transaction[];
-    products: StatProduct[]; // products with sold count
-}
 
 interface StatCardProps {
     title: string;
@@ -90,7 +82,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 // --- Main Component ---
 
-const Stats: React.FC<StatsProps> = ({ transactions = [], products = [] }) => {
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
+
+const Stats: React.FC = () => {
+    const { transactions, products } = useOutletContext<DashboardContextType>();
     const [dateRange, setDateRange] = useState('30'); // '7', '30', 'all'
 
     // --- SMART DATA LOGIC ---

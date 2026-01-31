@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
     Settings as SettingsIcon, Database, Shield, Award,
-    DollarSign, AlertCircle
+    DollarSign, AlertCircle, Ticket, LayoutGrid
 } from 'lucide-react';
 import { doc, setDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db, appId } from '../services/firebase';
@@ -19,25 +19,22 @@ import SettingsFinancial from '../components/settings/SettingsFinancial';
 import SettingsLoyalty from '../components/settings/SettingsLoyalty';
 import SettingsData from '../components/settings/SettingsData';
 import SettingsAuth from '../components/settings/SettingsAuth';
+import SettingsCampaigns from '../components/settings/SettingsCampaigns';
+import SettingsMenu from '../components/settings/SettingsMenu';
 import { FixedCosts, LoyaltySettings } from '../types';
 
-interface SettingsProps {
-    monthlyGoal: number;
-    setMonthlyGoal: (val: number) => void;
-    fixedCosts: FixedCosts;
-    setFixedCosts: (costs: FixedCosts) => void;
-    loyaltySettings: LoyaltySettings;
-    setLoyaltySettings: (settings: LoyaltySettings) => void;
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-const Settings: React.FC<SettingsProps> = ({
-    monthlyGoal,
-    setMonthlyGoal,
-    fixedCosts,
-    setFixedCosts,
-    loyaltySettings,
-    setLoyaltySettings
-}) => {
+const Settings: React.FC = () => {
+    const {
+        monthlyGoal,
+        setMonthlyGoal,
+        fixedCosts,
+        setFixedCosts,
+        loyaltySettings,
+        setLoyaltySettings
+    } = useOutletContext<DashboardContextType>();
     const [dbLoading, setDbLoading] = useState(false);
     const [confirmModal, setConfirmModal] = useState<{
         open: boolean;
@@ -209,6 +206,8 @@ const Settings: React.FC<SettingsProps> = ({
         { id: 'general', label: 'Genel', icon: SettingsIcon, color: 'indigo' },
         { id: 'financial', label: 'Finans', icon: DollarSign, color: 'emerald' },
         { id: 'loyalty', label: 'Sadakat', icon: Award, color: 'purple' },
+        { id: 'campaign', label: 'Kampanya', icon: Ticket, color: 'rose' },
+        { id: 'menu', label: 'Menü', icon: LayoutGrid, color: 'pink' },
         { id: 'auth', label: 'Yetki', icon: Shield, color: 'amber' },
         { id: 'data', label: 'Veri', icon: Database, color: 'rose' }
     ];
@@ -313,8 +312,14 @@ const Settings: React.FC<SettingsProps> = ({
                 {/* 🎁 LOYALTY SECTION */}
                 {activeSection === 'loyalty' && <SettingsLoyalty loyaltySettings={loyaltySettings} handleUpdateLoyaltySetting={handleUpdateLoyaltySetting} />}
 
+                {/* 🎟️ CAMPAIGN SECTION */}
+                {activeSection === 'campaign' && <SettingsCampaigns />}
+
                 {/* 🛡️ AUTH SECTION */}
                 {activeSection === 'auth' && <SettingsAuth />}
+
+                {/* 🍔 MENU SECTION */}
+                {activeSection === 'menu' && <SettingsMenu />}
 
                 {/* 🗄️ DATA SECTION */}
                 {activeSection === 'data' && <SettingsData dbLoading={dbLoading} openSeedModal={openSeedModal} openResetModal={openResetModal} />}

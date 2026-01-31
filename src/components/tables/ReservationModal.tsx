@@ -1,11 +1,12 @@
 import React, { Dispatch, SetStateAction } from 'react';
-import { CalendarClock, User, Clock, FileText, X, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { CalendarClock, User, Clock, FileText, X, RefreshCw, CheckCircle2, Star } from 'lucide-react';
 import { Table } from '../../types';
 
 interface ReservationForm {
     name: string;
     time: string;
     note: string;
+    isVIP: boolean;
 }
 
 interface ReservationModalProps {
@@ -54,6 +55,25 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
                     <div className="space-y-1.5">
                         <label className={`text-[10px] font-bold uppercase tracking-wider ml-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Not (Opsiyonel)</label>
                         <div className={`relative group flex items-start rounded-xl border transition-all focus-within:border-purple-500 focus-within:ring-1 focus-within:ring-purple-500 ${isDarkMode ? 'bg-slate-950 border-white/10' : 'bg-slate-50 border-slate-200'}`}><div className={`pl-4 pt-3.5 ${isDarkMode ? 'text-slate-500 group-focus-within:text-purple-400' : 'text-slate-400 group-focus-within:text-purple-600'}`}><FileText size={18} /></div><textarea rows={2} value={rezForm.note} onChange={e => setRezForm({ ...rezForm, note: e.target.value })} placeholder="Özel istekler..." className={`w-full bg-transparent py-3 px-3 outline-none text-sm font-medium resize-none ${isDarkMode ? 'text-white placeholder-slate-600' : 'text-slate-800 placeholder-slate-400'}`} /></div>
+                    </div>
+
+                    {/* VIP TOGGLE */}
+                    <div className={`flex items-center justify-between p-4 rounded-xl border transition-all ${rezForm.isVIP ? (isDarkMode ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200') : (isDarkMode ? 'bg-slate-950 border-white/10' : 'bg-slate-50 border-slate-200')}`}>
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${rezForm.isVIP ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-slate-200 text-slate-400'}`}>
+                                <Star size={20} fill={rezForm.isVIP ? "currentColor" : "none"} />
+                            </div>
+                            <div>
+                                <p className={`text-sm font-black ${rezForm.isVIP ? (isDarkMode ? 'text-amber-400' : 'text-amber-700') : (isDarkMode ? 'text-slate-300' : 'text-slate-700')}`}>VIP / Sadık Müşteri</p>
+                                <p className="text-[10px] opacity-60 font-bold uppercase tracking-wider">Özel servis uygulanır</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setRezForm({ ...rezForm, isVIP: !rezForm.isVIP })}
+                            className={`w-12 h-6 rounded-full transition-all relative ${rezForm.isVIP ? 'bg-amber-500' : 'bg-slate-400'}`}
+                        >
+                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${rezForm.isVIP ? 'left-7' : 'left-1'}`}></div>
+                        </button>
                     </div>
                 </div>
                 <div className={`p-6 pt-2 flex gap-3 ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>

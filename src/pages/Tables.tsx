@@ -23,15 +23,14 @@ import TableDetailPanel from '../components/tables/TableDetailPanel';
 
 import { Table, Product, Staff } from '../types';
 
-interface TablesProps {
-    tables: Table[];
-    products: Product[];
-    userRole: string | null;
-    currentStaff: Staff | null;
-    staffList?: Staff[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
+import { usePermissions } from '../hooks/usePermissions';
+import { PERMISSIONS } from '../utils/roles';
+import { bankOptions } from '../utils/pos/themes';
 
-const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaff, staffList }) => {
+const Tables: React.FC = () => {
+    const { tables, products, userRole, currentStaff, staff: staffList } = useOutletContext<DashboardContextType>();
     const [isDarkMode, toggleTheme] = useTheme() as [boolean, () => void];
 
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
@@ -51,22 +50,27 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
     const [sortOption, setSortOption] = useState('popularity');
     const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
+    // 🔥 GRID LAYOUT STATE
+    const [gridLayout, setGridLayout] = useState<'normal' | 'compact' | 'comfort'>(() => {
+        const saved = localStorage.getItem('table_grid_layout');
+        return (saved as any) || 'normal';
+    });
 
+    useEffect(() => {
+        localStorage.setItem('table_grid_layout', gridLayout);
+    }, [gridLayout]);
 
     const [isEmptyConfirmOpen, setIsEmptyConfirmOpen] = useState(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+    // ... rest of state ...
     const [isRezModalOpen, setIsRezModalOpen] = useState(false);
-    const [rezForm, setRezForm] = useState({ name: '', time: '', note: '' });
+    const [isRezCheckInOpen, setIsRezCheckInOpen] = useState(false);
+    const [rezForm, setRezForm] = useState({ name: '', time: '', note: '', isVIP: false });
+    const [pendingRezTable, setPendingRezTable] = useState<Table | null>(null);
 
     const [productToCustomize, setProductToCustomize] = useState<Product | null>(null);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
     const [cardBank, setCardBank] = useState('ziraat');
-
-    const bankOptions = [
-        { key: 'ziraat', label: 'Ziraat', gradient: 'from-red-600 to-red-900', border: 'border-red-500', shadow: 'shadow-red-500/40' },
-        { key: 'halk', label: 'Halk', gradient: 'from-blue-600 to-blue-900', border: 'border-blue-500', shadow: 'shadow-blue-500/40' },
-        { key: 'iban', label: 'Diğer', gradient: 'from-purple-600 to-purple-900', border: 'border-purple-500', shadow: 'shadow-purple-500/40' }
-    ];
 
     const handleTableClickWrapper = (table: Table) => {
         if (activeMode === 'transfer') {
@@ -76,7 +80,41 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
         } else if (activeMode === 'reserve') {
             handleQuickReserve(table);
         } else {
+            if (table.status === 'needs_cleaning') {
+                return toast.error("Bu masa temizlenmeden işlem yapılamaz! Önce temizlik modunu açınız.", {
+                    icon: '🧹',
+                    duration: 3000
+                });
+            }
+            if (table.status === 'reserved') {
+                setPendingRezTable(table);
+                setIsRezCheckInOpen(true);
+                return;
+            }
             setSelectedTable(table);
+        }
+    };
+
+    const confirmRezCheckIn = async () => {
+        if (!pendingRezTable) return;
+        setProcessing(true);
+        try {
+            const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', pendingRezTable.id);
+            await updateDoc(tableRef, {
+                status: 'occupied',
+                startTime: new Date().toISOString(),
+                lastOrderTime: new Date().toISOString(),
+                staffId: currentStaff?.id || 'unknown',
+                isVIP: pendingRezTable.reservation?.isVIP || false
+            });
+            setSelectedTable(pendingRezTable);
+            setIsRezCheckInOpen(false);
+            setPendingRezTable(null);
+            toast.success("Rezervasyon girişi yapıldı", { icon: '✅' });
+        } catch (error) {
+            toast.error("Hata oluştu");
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -91,7 +129,7 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
                 total: 0,
                 startTime: null,
                 lastOrderTime: null,
-                staffId: null // ✨ Masa temizlenince personel sahipliğini kaldır
+                staffId: null
             });
             toast.success(`${table.name} Temizlendi`, { icon: '🧹' });
         } catch (error) { toast.error("Hata oluştu"); }
@@ -149,7 +187,7 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
                 status: 'empty',
                 startTime: null,
                 lastOrderTime: null,
-                staffId: null // ✨ Kaynak masa boşaldığı için sahipliği kaldır
+                staffId: null
             });
             await batch.commit();
 
@@ -170,11 +208,28 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
         await executeTransfer(pendingTransfer.source, pendingTransfer.target, true);
     };
 
-    // ... Diğer handlerlar
-    // ... Diğer handlerlar
-
     useEffect(() => { if (selectedTable) { setRightPanelMode('menu'); setMenuSearchTerm(''); } }, [selectedTable?.id]);
     useEffect(() => { if (!selectedTable || !tables || tables.length === 0) return; const latestTable = tables.find(t => t.id === selectedTable.id); if (latestTable && (JSON.stringify(latestTable) !== JSON.stringify(selectedTable))) { setSelectedTable(latestTable); } }, [tables, selectedTable]);
+
+    // 🔥 Manual Request Completion Handler
+    const handleCompleteRequest = async (tableId: string, requestId: string) => {
+        try {
+            const table = tables.find(t => t.id === tableId);
+            if (!table || !table.requests) return;
+
+            const updatedRequests = table.requests.map(r =>
+                r.id === requestId ? { ...r, status: 'completed' } : r
+            );
+
+            const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', tableId);
+            await updateDoc(tableRef, { requests: updatedRequests });
+
+            toast.success("Bildirim tamamlandı", { icon: '✅' });
+        } catch (error) {
+            console.error("Bildirim güncellenemedi:", error);
+            toast.error("İşlem başarısız");
+        }
+    };
 
     const handleSaveReservation = async () => {
         if (!rezForm.name || !rezForm.time) return toast.error("İsim ve saat giriniz.");
@@ -184,14 +239,12 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
             const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id);
             await updateDoc(tableRef, {
                 status: 'reserved',
-                reservation: { customerName: rezForm.name, time: rezForm.time, note: rezForm.note || '' },
-                staffId: currentStaff?.id || 'unknown' // ✨ Rezervasyonu yapan personel
+                reservation: { customerName: rezForm.name, time: rezForm.time, note: rezForm.note || '', isVIP: rezForm.isVIP },
+                staffId: currentStaff?.id || 'unknown'
             });
-            setIsRezModalOpen(false); setRezForm({ name: '', time: '', note: '' }); setSelectedTable(null); toast.success("Rezervasyon kaydedildi");
+            setIsRezModalOpen(false); setRezForm({ name: '', time: '', note: '', isVIP: false }); setSelectedTable(null); toast.success("Rezervasyon kaydedildi");
         } catch (error) { console.error(error); toast.error("Hata oluştu"); } finally { setProcessing(false); }
     };
-
-
 
     const handleProductClick = (product: Product) => { if (product.options && product.options.length > 0) { setProductToCustomize(product); } else { handleConfirmOrder({ ...product, quantity: 1 }); } };
 
@@ -209,7 +262,7 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
             let newOrders = [...currentTable.orders];
             let found = false;
             newOrders = newOrders.map(order => {
-                if (order.name === customizedProduct.name && order.price === unitPrice && order.note === customizedProduct.note && !order.status /* Assuming status field logic, using Loose check */) {
+                if (order.name === customizedProduct.name && order.price === unitPrice && order.note === customizedProduct.note) {
                     found = true;
                     return { ...order, quantity: order.quantity + qty };
                 }
@@ -229,22 +282,24 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
             const updateData: any = { orders: newOrders, total: newTotal, status: currentTable.status === 'empty' ? 'occupied' : currentTable.status, lastOrderTime: new Date().toISOString() };
             if (currentTable.status === 'empty') {
                 updateData.startTime = new Date().toISOString();
-                updateData.staffId = currentStaff?.id || 'unknown'; // ✨ İlk siparişi giren personel masanın sahibi olur
+                updateData.staffId = currentStaff?.id || 'unknown';
             }
             await updateDoc(tableRef, updateData);
             toast.success("Ürün eklendi");
         } catch (error) { console.error(error); toast.error("Eklenemedi"); } finally { setProcessing(false); }
     };
 
+    const { hasPermission } = usePermissions();
+
     const handleRemoveOrder = async (tableId: string, orderId: string, price: number) => {
-        if (userRole === 'garson') {
+        if (!hasPermission(PERMISSIONS.ORDER_DELETE)) {
             return toast.error("Ürün silme yetkiniz yok!", { icon: '🔒' });
         }
         if (processing) return; setProcessing(true); const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', tableId); try { const currentTable = tables.find(t => t.id === tableId); if (!currentTable) return; const existingOrderIndex = currentTable.orders.findIndex(o => o.id === orderId); if (existingOrderIndex === -1) return; const newOrders = [...currentTable.orders]; const newTotal = currentTable.total - price; if (newOrders[existingOrderIndex].quantity > 1) { newOrders[existingOrderIndex].quantity -= 1; } else { newOrders.splice(existingOrderIndex, 1); } const newStatus = newOrders.length === 0 ? 'empty' : currentTable.status; const updateData: any = { orders: newOrders, total: newTotal, status: newStatus }; if (newStatus === 'empty') { updateData.startTime = null; updateData.lastOrderTime = null; } await updateDoc(tableRef, updateData); } catch (error) { console.error(error); toast.error("Silinemedi"); } finally { setProcessing(false); }
     };
 
     const confirmMarkAsEmpty = async () => {
-        if (userRole === 'garson') {
+        if (!hasPermission(PERMISSIONS.TABLE_MANAGE)) {
             return toast.error("Masa sıfırlama yetkiniz yok!", { icon: '🔒' });
         }
         if (!selectedTable) return; await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), { status: 'empty', orders: [], total: 0, startTime: null, lastOrderTime: null }); setSelectedTable(prev => prev ? ({ ...prev, status: 'empty', orders: [], total: 0 }) : null); setIsEmptyConfirmOpen(false); toast.success("Masa temizlendi");
@@ -267,7 +322,6 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
                 category: 'Masa Satışı',
                 subMethod: subMethodDisplay
             });
-            // Update product sales counts
             const productUpdates = selectedTable.orders.map(async (order) => {
                 const productRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'products', order.productId);
                 await updateDoc(productRef, {
@@ -275,6 +329,14 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
                 });
             });
             await Promise.all(productUpdates);
+
+            try {
+                const { StockService } = await import('../services/stock.service');
+                await StockService.processOrderStockDeduction(selectedTable.orders);
+            } catch (stockError) {
+                console.error("Stok düşümü hatası:", stockError);
+            }
+
             await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), {
                 orders: [],
                 total: 0,
@@ -297,9 +359,7 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
 
     const handlePrintBill = () => { if (!selectedTable || selectedTable.orders.length === 0) return; setPrintData({ title: selectedTable.name, type: 'Masa Hesabı', items: selectedTable.orders.map(o => ({ name: o.name, quantity: o.quantity, price: o.price, note: o.note })), total: selectedTable.total, date: new Date().toLocaleString('tr-TR') }); setTimeout(() => window.print(), 100); };
 
-    // ✨ FİLTRELEME MANTIĞI: Garson sadece kendi masalarını ve boş masaları görür
     const filteredTables = useMemo(() => tables.filter(t => {
-        // 1. Bölge Filtresi
         if (activeZone !== 'Tümü' && t.zone !== activeZone) return false;
         return true;
     }), [tables, activeZone]);
@@ -308,14 +368,23 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
     const zones = useMemo(() => [...new Set(tables.map(t => t.zone))].filter(z => z), [tables]);
     const categories = useMemo(() => ['Tümü', ...new Set(products.map(p => p.category))], [products]);
 
-    // 🔥 HESAPLAMALAR
     const totalTables = tables.length || 50;
     const occupiedTables = tables.filter(t => t.status === 'occupied').length || 0;
 
     return (
-        <div className={`flex flex-col md:flex-row h-[calc(100vh-100px)] overflow-hidden relative font-sans transition-colors duration-500 ${isDarkMode ? 'text-slate-200 bg-[#0F131C]' : 'text-slate-800 bg-slate-50'}`}>
+        <div className={`flex flex-col md:flex-row h-[calc(100vh-100px)] overflow-hidden relative font-sans transition-colors duration-500 ${isDarkMode ? 'text-slate-200 bg-[#0F131C]' : 'text-slate-800 bg-slate-100'}`}>
             <Toaster position="bottom-center" reverseOrder={false} gutter={8} toastOptions={{ duration: 2000, style: { background: isDarkMode ? 'rgba(30, 35, 48, 0.9)' : 'rgba(255, 255, 255, 0.9)', color: isDarkMode ? '#fff' : '#1e293b', backdropFilter: 'blur(10px)', border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.05)', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.3)', borderRadius: '16px', padding: '12px 24px', fontSize: '13px', fontWeight: '600' }, success: { iconTheme: { primary: '#10b981', secondary: 'white' } }, error: { iconTheme: { primary: '#ef4444', secondary: 'white' } } }} />
             <ConfirmationModal isOpen={isEmptyConfirmOpen} onClose={() => setIsEmptyConfirmOpen(false)} onConfirm={confirmMarkAsEmpty} title="Masayı Temizle" message="Bu masayı boş ve temiz olarak işaretlemek istediğinize emin misiniz? (Siparişler silinir)" type="warning" confirmText="TEMİZLE" loading={false} />
+            <ConfirmationModal
+                isOpen={isRezCheckInOpen}
+                onClose={() => { setIsRezCheckInOpen(false); setPendingRezTable(null); }}
+                onConfirm={confirmRezCheckIn}
+                title="Rezervasyon Girişi"
+                message={`Bu masa ${pendingRezTable?.reservation?.customerName || 'Müşteri'} adına ${pendingRezTable?.reservation?.time || ''} için rezerve edilmiştir. Misafir girişi yapılsın mı?`}
+                type="info"
+                confirmText="GİRİŞ YAP"
+                loading={processing}
+            />
             <TableCloseModal isOpen={isCloseModalOpen} onClose={() => setIsCloseModalOpen(false)} onConfirm={confirmCloseTable} tableName={selectedTable?.name || ''} amount={selectedTable?.total || 0} method={paymentMethod} bank={cardBank} loading={processing} />
             <ProductOptionsModal isOpen={!!productToCustomize} onClose={() => setProductToCustomize(null)} product={productToCustomize} onConfirm={handleConfirmOrder} />
 
@@ -341,71 +410,95 @@ const Tables: React.FC<TablesProps> = ({ tables, products, userRole, currentStaf
                 isDarkMode={isDarkMode}
             />
 
-            {/* --- SOL PANEL: MASA HARİTASI --- */}
-            <div className={`flex-1 overflow-y-auto p-4 md:p-6 transition-colors duration-300 ${selectedTable ? 'hidden lg:block' : 'block'} ${isDarkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
-                <TableMapHeader
-                    isDarkMode={isDarkMode}
-                    toggleTheme={toggleTheme}
-                    activeMode={activeMode}
-                    setActiveMode={setActiveMode}
-                    setTransferSource={setTransferSource}
-                    transferSource={transferSource}
-                    occupiedTables={occupiedTables}
-                    totalTables={totalTables}
-                    activeZone={activeZone}
-                    setActiveZone={setActiveZone}
-                    zones={zones}
-                />
-
-                <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-                    {filteredTables.map(table => (
-                        <TableCard
-                            key={table.id}
-                            table={table}
-                            activeMode={activeMode}
-                            transferSource={transferSource}
-                            isDarkMode={isDarkMode}
-                            isSelected={selectedTable?.id === table.id}
-                            onClick={handleTableClickWrapper}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            {
-                selectedTable && (
-                    <TableDetailPanel
-                        selectedTable={selectedTable}
-                        setSelectedTable={setSelectedTable}
+            {!selectedTable ? (
+                <div className={`flex-1 overflow-y-auto p-4 md:p-6 transition-all duration-500 ${isDarkMode ? 'bg-[#0F131C]' : 'bg-slate-100'}`}>
+                    <TableMapHeader
                         isDarkMode={isDarkMode}
-                        rightPanelMode={rightPanelMode}
-                        setRightPanelMode={setRightPanelMode}
-                        categories={categories}
-                        selectedCategory={selectedCategory}
-                        setSelectedCategory={setSelectedCategory}
-                        menuSearchTerm={menuSearchTerm}
-                        setMenuSearchTerm={setMenuSearchTerm}
-                        isSortMenuOpen={isSortMenuOpen}
-                        setIsSortMenuOpen={setIsSortMenuOpen}
-                        sortOption={sortOption}
-                        setSortOption={setSortOption}
-                        processedProducts={processedProducts}
-                        handleProductClick={handleProductClick}
-                        handleRemoveOrder={handleRemoveOrder}
-                        paymentMethod={paymentMethod}
-                        setPaymentMethod={setPaymentMethod}
-                        cardBank={cardBank}
-                        setCardBank={setCardBank}
-                        bankOptions={bankOptions}
-                        handlePrintBill={handlePrintBill}
-                        setIsCloseModalOpen={setIsCloseModalOpen}
-                        processing={processing}
-                        userRole={userRole}
-                        staffList={staffList}
-                        printData={printData}
+                        toggleTheme={toggleTheme}
+                        activeMode={activeMode}
+                        setActiveMode={setActiveMode}
+                        setTransferSource={setTransferSource}
+                        transferSource={transferSource}
+                        occupiedTables={occupiedTables}
+                        totalTables={totalTables}
+                        activeZone={activeZone}
+                        setActiveZone={setActiveZone}
+                        zones={zones}
+                        tables={tables}
+                        gridLayout={gridLayout}
+                        setGridLayout={setGridLayout}
                     />
-                )
+
+                    <div className="max-w-[1600px] mx-auto">
+                        <div className="flex flex-wrap justify-center gap-2 md:gap-4">
+                            {filteredTables.map(table => (
+                                <div
+                                    key={table.id}
+                                    className={`
+                                        transition-all duration-500
+                                        ${gridLayout === 'compact' ? 'w-[calc(25%-6px)] sm:w-[calc(20%-16px)] lg:w-[calc(14.28%-16px)] xl:w-[calc(11.11%-16px)] 2xl:w-[calc(10%-16px)] min-w-[70px]' :
+                                            gridLayout === 'comfort' ? 'w-[calc(50%-6px)] sm:w-[calc(33.33%-16px)] lg:w-[calc(25%-16px)] xl:w-[calc(20%-16px)] 2xl:w-[calc(16.66%-16px)] min-w-[140px]' :
+                                                'w-[calc(33.333%-6px)] sm:w-[calc(25%-16px)] lg:w-[calc(20%-16px)] xl:w-[calc(16.666%-16px)] 2xl:w-[calc(12.5%-16px)] min-w-[90px]'}
+                                    `}
+                                >
+                                    <TableCard
+                                        table={table}
+                                        activeMode={activeMode}
+                                        transferSource={transferSource}
+                                        isDarkMode={isDarkMode}
+                                        isSelected={(selectedTable as any)?.id === table.id}
+                                        onClick={handleTableClickWrapper}
+                                        gridLayout={gridLayout}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <TableDetailPanel
+                    selectedTable={selectedTable}
+                    setSelectedTable={setSelectedTable}
+                    isDarkMode={isDarkMode}
+                    rightPanelMode={rightPanelMode}
+                    setRightPanelMode={setRightPanelMode}
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
+                    menuSearchTerm={menuSearchTerm}
+                    setMenuSearchTerm={setMenuSearchTerm}
+                    isSortMenuOpen={isSortMenuOpen}
+                    setIsSortMenuOpen={setIsSortMenuOpen}
+                    sortOption={sortOption}
+                    setSortOption={setSortOption}
+                    processedProducts={processedProducts}
+                    handleProductClick={handleProductClick}
+                    handleRemoveOrder={handleRemoveOrder}
+                    paymentMethod={paymentMethod}
+                    setPaymentMethod={setPaymentMethod}
+                    cardBank={cardBank}
+                    setCardBank={setCardBank}
+                    bankOptions={bankOptions}
+                    handlePrintBill={handlePrintBill}
+                    setIsCloseModalOpen={setIsCloseModalOpen}
+                    processing={processing}
+                    userRole={userRole}
+                    staffList={staffList}
+                    printData={printData}
+                    onCompleteRequest={handleCompleteRequest}
+                    onToggleVIP={async () => {
+                        if (!selectedTable) return;
+                        const newStatus = !(selectedTable.isVIP || selectedTable.reservation?.isVIP);
+                        await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), {
+                            isVIP: newStatus
+                        });
+                        setSelectedTable(prev => prev ? ({ ...prev, isVIP: newStatus }) : null);
+                        toast.success(newStatus ? "Masa VIP olarak işaretlendi" : "VIP statüsü kaldırıldı", { icon: '✨' });
+                    }}
+                />
+            )
             }
+            <Receipt data={printData} />
         </div >
     );
 };

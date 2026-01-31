@@ -75,17 +75,19 @@ const WheelOfFate: React.FC<WheelOfFateProps> = ({ isOpen, onClose, customerProf
                         ...p,
                         id: i,
                         type: (p.value > 0) ? 'win' : 'lose',
-                        border: p.border || ((p.value > 0) ? '#D4AF37' : '#8A6E2F'),
-                        weight: Number(p.weight) || 10
+                        border: p.border || ((p.value >= 1000) ? '#FFF' : (p.value > 0) ? '#D4AF37' : '#8A6E2F'),
+                        weight: Number(p.weight) || 10,
+                        isJackpot: p.value >= 1000
                     }));
                     setPrizes(loadedPrizes);
                 } else {
                     setPrizes([
-                        { id: 1, label: '50 VOLT', value: 50, type: 'win', color: '#0f0f0f', border: '#D4AF37', weight: 10 },
+                        { id: 1, label: '50 VOLT', value: 50, type: 'win', color: '#0f0f0f', border: '#D4AF37', weight: 30 },
                         { id: 2, label: 'BOŞ', value: 0, type: 'lose', color: '#1a1a1a', border: '#8A6E2F', weight: 40 },
-                        { id: 3, label: '100 VOLT', value: 100, type: 'win', color: '#0f0f0f', border: '#D4AF37', weight: 5 },
+                        { id: 3, label: '100 VOLT', value: 100, type: 'win', color: '#0f0f0f', border: '#D4AF37', weight: 15 },
                         { id: 4, label: 'BOŞ', value: 0, type: 'lose', color: '#1a1a1a', border: '#8A6E2F', weight: 40 },
-                        { id: 5, label: '25 VOLT', value: 25, type: 'win', color: '#0f0f0f', border: '#D4AF37', weight: 20 },
+                        { id: 5, label: '25 VOLT', value: 25, type: 'win', color: '#0f0f0f', border: '#D4AF37', weight: 40 },
+                        { id: 6, label: 'JACKPOT', value: 1000, type: 'win', color: '#D4AF37', border: '#FFF', weight: 1, isJackpot: true },
                     ]);
                 }
             } catch (error) {

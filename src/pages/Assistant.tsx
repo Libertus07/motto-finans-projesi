@@ -4,16 +4,16 @@ import { formatCurrency } from '../utils/helpers';
 import { GEMINI_API_KEY } from '../utils/constants';
 import { FinancialStats } from '../types';
 
-interface AssistantProps {
-    stats: FinancialStats;
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-interface ChatMessage {
-    role: 'ai' | 'user' | 'system';
-    text: string;
-}
+const Assistant: React.FC = () => {
+    const { stats } = useOutletContext<DashboardContextType>();
 
-const Assistant: React.FC<AssistantProps> = ({ stats }) => {
+    interface ChatMessage {
+        role: 'ai' | 'user' | 'system';
+        text: string;
+    }
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { role: 'ai', text: 'Merhaba! İşletmenle ilgili finansal sorularını cevaplamaya hazırım.' }
     ]);

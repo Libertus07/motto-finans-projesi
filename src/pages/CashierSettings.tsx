@@ -15,25 +15,25 @@ import InfoModal from '../components/InfoModal';
 import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 import { Transaction } from '../types';
 
-interface CashierSettingsProps {
-    transactions?: Transaction[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-interface Permission {
-    id: string;
-    label: string;
-    icon: LucideIcon;
-    granted: boolean;
-    color: string;
-}
+const CashierSettings: React.FC = () => {
+    const { transactions } = useOutletContext<DashboardContextType>();
 
-interface Section {
-    id: string;
-    label: string;
-    icon: LucideIcon;
-}
+    interface Permission {
+        id: string;
+        label: string;
+        icon: LucideIcon;
+        granted: boolean;
+        color: string;
+    }
 
-const CashierSettings: React.FC<CashierSettingsProps> = () => {
+    interface Section {
+        id: string;
+        label: string;
+        icon: LucideIcon;
+    }
     const [loading, setLoading] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [infoModal, setInfoModal] = useState<{ isOpen: boolean; type: 'success' | 'error' | 'info' | 'warning'; title: string; message: string }>({

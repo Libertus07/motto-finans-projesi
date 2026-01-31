@@ -144,12 +144,12 @@ export const useLoyalty = () => {
             // ☁️ CLOUD FUNCTION ÇAĞRISI (Güvenli Backend)
             const redeemFn = httpsCallable(functions, 'redeemPoints');
 
-            const result: any = await redeemFn({
+            const result = await redeemFn({
                 customerId: loyaltyCustomer.phone,
                 pointsToRedeem: Number(points),
                 appId: appId,
                 shopId: CURRENT_SHOP_ID
-            });
+            }) as { data: { success: boolean; newPoints: number } };
 
             if (result.data.success) {
                 // Başarılı ise yerel state'i güncelle
@@ -160,9 +160,9 @@ export const useLoyalty = () => {
                 closeLoyaltyModal();
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Puan harcama hatası:", error);
-            alert("İşlem başarısız: " + error.message);
+            alert("İşlem başarısız: " + (error as Error).message);
         } finally {
             setProcessing(false);
         }
@@ -177,12 +177,12 @@ export const useLoyalty = () => {
         try {
             // ☁️ CLOUD FUNCTION ÇAĞRISI (Güvenli İade)
             const restoreFn = httpsCallable(functions, 'restorePoints');
-            const result: any = await restoreFn({
+            const result = await restoreFn({
                 customerId: loyaltyCustomer.phone || loyaltyCustomer.id,
                 pointsToRestore: Number(points),
                 appId: appId,
                 shopId: CURRENT_SHOP_ID
-            });
+            }) as { data: { success: boolean; newPoints: number } };
 
             if (result.data.success) {
                 // Local state'i güncelle
@@ -195,7 +195,7 @@ export const useLoyalty = () => {
     }, [loyaltyCustomer]);
 
     // ✨ YENİ: Firebase'e Kayıt Fonksiyonu
-    const registerCustomer = async (customerData: any) => {
+    const registerCustomer = async (customerData: { name: string; surname: string; phone: string; birthday?: string }) => {
         setProcessing(true);
         try {
             const phone = customerData.phone;
@@ -209,7 +209,7 @@ export const useLoyalty = () => {
                     const s = settingsSnap.data();
                     WELCOME_BONUS = s.refereeReward || s.welcomeBonus || 50;
                 }
-            } catch (e) { console.error("Bonus ayarı çekilemedi, varsayılan kullanılıyor."); }
+            } catch (_) { console.error("Bonus ayarı çekilemedi, varsayılan kullanılıyor."); }
 
             const newCustomer = {
                 name: customerData.name.toUpperCase(),

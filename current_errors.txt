@@ -1,0 +1,5 @@
+﻿src/components/ReloadPrompt.tsx(1,31): error TS2307: Cannot find module 'virtual:pwa-register/react' or its corresponding type declarations.
+src/components/ReloadPrompt.tsx(9,22): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/components/ReloadPrompt.tsx(12,25): error TS7006: Parameter 'error' implicitly has an 'any' type.
+src/pages/QrMenu/views/AccountView.tsx(504,21): error TS2739: Type '{ id: string; title: string; description: string; code: string; expiresAt: string; image: string; }' is missing the following properties from type 'Deal': discountValue, discountType
+src/pages/QrMenu/views/AccountView.tsx(512,21): error TS2739: Type '{ id: string; title: string; description: string; code: string; expiresAt: string; image: string; }' is missing the following properties from type 'Deal': discountValue, discountType

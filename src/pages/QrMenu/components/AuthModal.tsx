@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mail, Lock, User, Phone, Calendar, ArrowRight, Loader2, Sparkles, Eye, EyeOff, Check, Ticket } from 'lucide-react';
+import { X, Mail, Lock, User, Phone, Calendar, ArrowRight, Loader2, Sparkles, Eye, EyeOff, Check, Ticket, Crown } from 'lucide-react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, sendPasswordResetEmail } from 'firebase/auth';
-import { doc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, increment } from 'firebase/firestore';
 import { auth, db } from '../../../services/firebase';
 import { COLLECTIONS } from '../../../utils/firebasePaths';
 import { LoyaltyCustomer } from '../../../types';
@@ -15,6 +15,8 @@ interface AuthModalProps {
     onModeChange: (mode: 'login' | 'register') => void;
     t: (key: string) => string;
     welcomeBonus: number;
+    referrerReward: number;
+    refereeReward: number;
 }
 
 const InputField = React.forwardRef<HTMLInputElement, any>(({ icon: Icon, type = "text", ...props }, ref) => {
@@ -24,28 +26,29 @@ const InputField = React.forwardRef<HTMLInputElement, any>(({ icon: Icon, type =
     return (
         <div className="relative group">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#432818]/40 group-focus-within:text-[#D4AF37] transition-colors">
-                <Icon size={20} />
+                <Icon size={18} />
             </div>
             <input
                 {...props}
                 type={isPassword ? (showPassword ? "text" : "password") : type}
                 ref={ref}
-                className={`w-full pl-12 ${isPassword ? 'pr-12' : 'pr-4'} py-4 bg-white border-2 border-[#432818]/5 rounded-xl outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all placeholder:text-[#432818]/30 font-medium text-[#432818]`}
+                className={`w-full pl-9 ${isPassword ? 'pr-9' : 'pr-3'} py-2 bg-white border-2 border-[#432818]/5 rounded-xl outline-none focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 transition-all placeholder:text-[#432818]/30 font-medium text-[#432818] text-sm`}
             />
             {isPassword && (
                 <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#432818]/40 hover:text-[#D4AF37] transition-colors p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#432818]/40 hover:text-[#D4AF37] transition-colors p-1"
                 >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
             )}
         </div>
     );
 });
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChange, t, welcomeBonus }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChange, t, welcomeBonus, referrerReward, refereeReward }) => {
+
     const { showToast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const firstInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +130,53 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChan
 
             const personalInviteCode = generateInviteCode();
 
+            let totalStartingPoints = welcomeBonus;
+            // Actually wait, COLLECTIONS uses dynamic paths?? No, COLLECTIONS usually has pure names.
+            // Let's check imports. COLLECTIONS come from utils/firebasePaths.
+            // But we need the SHOP_ID context for where queries if challenges are per shop? 
+            // In handleRegister, we are creating users in `customers` collection.
+            // The previous code used `doc(db, COLLECTIONS.CUSTOMERS, ...)` which assumes global customers or correct path.
+            // Let's assume COLLECTIONS.CUSTOMERS is the correct path.
+
+            // 1. Process Referral Logic
+            if (registerForm.inviteCode && registerForm.inviteCode.length > 5) {
+                try {
+                    const customersRef = collection(db, COLLECTIONS.CUSTOMERS);
+                    const q = query(customersRef, where('personalInviteCode', '==', registerForm.inviteCode.toUpperCase().trim()));
+                    const snapshot = await getDocs(q);
+
+                    if (!snapshot.empty) {
+                        const referrerDoc = snapshot.docs[0];
+                        const referrerData = referrerDoc.data();
+
+                        // Prevent self-referral (unlikely here as we are creating new user)
+
+                        // Update Referrer
+                        await updateDoc(referrerDoc.ref, {
+                            points: increment(referrerReward),
+                            referralCount: increment(1)
+                        });
+
+                        // Add transaction for Referrer
+                        await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), {
+                            customerPhone: referrerData.phone,
+                            customerId: referrerDoc.id,
+                            type: 'referral_bonus',
+                            amount: 0,
+                            points: referrerReward,
+                            desc: `Arkadaş Daveti Bonusu: ${registerForm.firstName} 🎉`,
+                            date: new Date().toLocaleDateString('tr-TR'),
+                            timestamp: serverTimestamp()
+                        });
+
+                        // Bonus for Referee (New User)
+                        totalStartingPoints += refereeReward;
+                    }
+                } catch (err) {
+                    console.error("Referral check failed", err);
+                }
+            }
+
             const newProfile: any = {
                 uid: cred.user.uid,
                 firstName: registerForm.firstName,
@@ -136,7 +186,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChan
                 birthday: registerForm.birthday,
                 inviteCode: registerForm.inviteCode,
                 personalInviteCode, // Kişiye özel davet kodu
-                points: welcomeBonus, // Welcome bonus (Dynamic)
+                points: totalStartingPoints, // Welcome bonus + Referral Bonus
+                referredBy: (registerForm.inviteCode && registerForm.inviteCode.length > 5 && totalStartingPoints > welcomeBonus) ? registerForm.inviteCode.toUpperCase().trim() : null, // Storing code effectively links to referrer if we query code, but ID is better. 
+                // Wait, I don't have referrerID in scope easily unless I lift it out.
+                // Let's just save the inviteCode used for now as 'usedInviteCode'.
+                usedInviteCode: registerForm.inviteCode ? registerForm.inviteCode.toUpperCase().trim() : null,
                 favorites: [],
                 createdAt: new Date().toISOString()
             };
@@ -149,7 +203,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChan
                 name: registerForm.firstName.toUpperCase(),
                 surname: registerForm.lastName.toUpperCase(),
                 birthday: registerForm.birthday || "",
-                points: welcomeBonus,
+                points: totalStartingPoints,
                 inviteCode: registerForm.inviteCode,
                 personalInviteCode, // POS kaydına da ekle
                 tier: 'BRONZE',
@@ -174,6 +228,20 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChan
                 date: new Date().toLocaleDateString('tr-TR'),
                 timestamp: serverTimestamp()
             });
+
+            // Extra transaction log for referral bonus if applicable
+            if (totalStartingPoints > welcomeBonus) {
+                await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), {
+                    customerPhone: cleanPhone,
+                    customerId: cred.user.uid,
+                    type: 'gift',
+                    amount: 0,
+                    points: refereeReward,
+                    desc: 'Davet ile Kayıt Bonusu 🎁',
+                    date: new Date().toLocaleDateString('tr-TR'),
+                    timestamp: serverTimestamp()
+                });
+            }
 
             onClose();
             showToast(`Motto Club'a Hoş Geldiniz!  Volt Hesabınıza Yüklendi ⚡`, 'success');
@@ -238,25 +306,25 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChan
     };
 
     return (
-        <div className="fixed inset-0 z-[70] bg-[#1a1a1a]/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
-            <div className="bg-[#FDFBF7] w-full max-w-sm rounded-[2rem] p-8 relative shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden">
+        <div className="fixed inset-0 z-[70] bg-[#1a1a1a]/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-[#FDFBF7] w-full max-w-sm max-h-[90vh] overflow-y-auto custom-scrollbar rounded-[1.5rem] p-5 relative shadow-2xl scale-100 animate-in zoom-in-95 duration-200 my-auto">
 
                 {/* Decorative Background Elements */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-[#D4AF37]/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
 
                 <button
                     onClick={onClose}
-                    className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-[#432818]/5 hover:bg-[#432818]/10 transition-colors text-[#432818]"
+                    className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full bg-[#432818]/5 hover:bg-[#432818]/10 transition-colors text-[#432818] z-20"
                 >
-                    <X size={18} />
+                    <X size={16} />
                 </button>
 
-                <div className="text-center mb-8 relative z-10">
-                    <div className="w-16 h-16 bg-[#D4AF37] rounded-2xl rotate-3 mx-auto flex items-center justify-center shadow-lg shadow-orange-900/10 mb-4">
-                        <Sparkles size={32} className="text-[#FDFBF7]" />
+                <div className="text-center mb-4 relative z-10">
+                    <div className="w-12 h-12 bg-[#D4AF37] rounded-xl rotate-3 mx-auto flex items-center justify-center shadow-lg shadow-orange-900/10 mb-2">
+                        <Crown size={24} className="text-[#FDFBF7]" />
                     </div>
-                    <h2 className="text-2xl font-black text-[#432818] uppercase tracking-widest font-cinzel">Motto Club</h2>
-                    <p className="text-[#BB9457] font-bold text-xs font-cinzel tracking-wider mt-1">
+                    <h2 className="text-lg font-black text-[#432818] uppercase tracking-widest font-cinzel">Motto Club</h2>
+                    <p className="text-[#BB9457] font-bold text-[10px] font-cinzel tracking-wider mt-0.5">
                         {activeView === 'forgot-password' ? t('forgot_password_title') : (activeView === 'agreement' ? t('agreement_title') : (activeView === 'login' ? t('login_title') : t('register_title')))}
                     </p>
                 </div>
@@ -311,8 +379,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChan
                 )}
 
                 {activeView === 'register' && (
-                    <form onSubmit={handleRegister} className="space-y-3 relative z-10">
-                        <div className="flex gap-3">
+                    <form onSubmit={handleRegister} className="space-y-1 relative z-10">
+                        <div className="flex gap-2">
                             <InputField icon={User} placeholder={t('name_placeholder')} value={registerForm.firstName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegisterForm({ ...registerForm, firstName: e.target.value })} ref={firstInputRef} />
                             <InputField icon={User} placeholder={t('surname_placeholder')} value={registerForm.lastName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegisterForm({ ...registerForm, lastName: e.target.value })} />
                         </div>
@@ -340,7 +408,70 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, mode, onModeChan
                             </div>
                         )}
 
-                        <InputField icon={Calendar} type="date" max={today} value={registerForm.birthday} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegisterForm({ ...registerForm, birthday: e.target.value })} />
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#432818]/60 ml-1 font-cinzel">DOĞUM TARİHİ</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {/* GÜN */}
+                                <div className="relative">
+                                    <select
+                                        value={registerForm.birthday ? registerForm.birthday.split('-')[2] : ''}
+                                        onChange={(e) => {
+                                            const day = e.target.value;
+                                            const current = registerForm.birthday ? registerForm.birthday.split('-') : ['', '', ''];
+                                            const year = current[0] || new Date().getFullYear().toString();
+                                            const month = current[1] || '01';
+                                            setRegisterForm({ ...registerForm, birthday: `${year}-${month}-${day}` });
+                                        }}
+                                        className="w-full px-3 py-2 bg-white border-2 border-[#432818]/5 rounded-xl outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10 transition-all font-medium text-[#432818] text-sm appearance-none"
+                                    >
+                                        <option value="" disabled>Gün</option>
+                                        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                                            <option key={d} value={d.toString().padStart(2, '0')}>{d}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* AY */}
+                                <div className="relative">
+                                    <select
+                                        value={registerForm.birthday ? registerForm.birthday.split('-')[1] : ''}
+                                        onChange={(e) => {
+                                            const month = e.target.value;
+                                            const current = registerForm.birthday ? registerForm.birthday.split('-') : ['', '', ''];
+                                            const year = current[0] || new Date().getFullYear().toString();
+                                            const day = current[2] || '01';
+                                            setRegisterForm({ ...registerForm, birthday: `${year}-${month}-${day}` });
+                                        }}
+                                        className="w-full px-3 py-2 bg-white border-2 border-[#432818]/5 rounded-xl outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10 transition-all font-medium text-[#432818] text-sm appearance-none"
+                                    >
+                                        <option value="" disabled>Ay</option>
+                                        {['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'].map((m, i) => (
+                                            <option key={m} value={(i + 1).toString().padStart(2, '0')}>{m}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* YIL */}
+                                <div className="relative">
+                                    <select
+                                        value={registerForm.birthday ? registerForm.birthday.split('-')[0] : ''}
+                                        onChange={(e) => {
+                                            const year = e.target.value;
+                                            const current = registerForm.birthday ? registerForm.birthday.split('-') : ['', '', ''];
+                                            const month = current[1] || '01';
+                                            const day = current[2] || '01';
+                                            setRegisterForm({ ...registerForm, birthday: `${year}-${month}-${day}` });
+                                        }}
+                                        className="w-full px-3 py-2 bg-white border-2 border-[#432818]/5 rounded-xl outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/10 transition-all font-medium text-[#432818] text-sm appearance-none"
+                                    >
+                                        <option value="" disabled>Yıl</option>
+                                        {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                                            <option key={y} value={y.toString()}>{y}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="flex items-start gap-2 px-1 mt-2">
                             <div

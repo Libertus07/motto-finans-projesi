@@ -13,17 +13,17 @@ import InfoModal from '../components/InfoModal';
 import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 import { Debt, PaymentMethod, BankName } from '../types';
 
-interface DebtsProps {
-    debts: Debt[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-interface PaymentModalData {
-    id: string;
-    supplier: string;
-    currentBalance: number;
-}
+const Debts: React.FC = () => {
+    const { debts } = useOutletContext<DashboardContextType>();
 
-const Debts: React.FC<DebtsProps> = ({ debts }) => {
+    interface PaymentModalData {
+        id: string;
+        supplier: string;
+        currentBalance: number;
+    }
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active'); // active, history
     const [deleteId, setDeleteId] = useState<string | null>(null);

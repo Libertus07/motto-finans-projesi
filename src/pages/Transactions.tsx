@@ -7,13 +7,54 @@ import { useTransactionLogic } from '../hooks/useTransactionLogic';
 import { formatCurrency } from '../utils/helpers';
 import { Transaction } from '../types';
 
-interface TransactionsProps {
-    transactions: Transaction[];
-    quickActions: any[]; // Define properly if possible, but any is acceptable for now
-    isPatron: boolean;
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
+import { usePermissions } from '../hooks/usePermissions';
+import { PERMISSIONS } from '../utils/roles';
 
-const Transactions: React.FC<TransactionsProps> = ({ transactions, quickActions, isPatron }) => {
+const Transactions: React.FC = () => {
+    const { transactions, quickActions } = useOutletContext<DashboardContextType>();
+
+    // 🔥 PERMISSION CHECK
+    const { hasPermission } = usePermissions();
+    const canManage = hasPermission(PERMISSIONS.TRANSACTION_MANAGE);
+    // Backward compatibility: 'isPatron' prop in children might expect boolean, passing permission result
+    const isPatron = canManage;
+
+    // Pagination State
+    const [archives, setArchives] = React.useState<Transaction[]>([]);
+    const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+
+    // Merge live transactions with loaded archives
+    // Use Map to ensure uniqueness by ID in case of overlap
+    const allTransactions = React.useMemo(() => {
+        const map = new Map();
+        transactions.forEach(t => map.set(t.id, t));
+        archives.forEach(t => map.set(t.id, t));
+        return Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [transactions, archives]);
+
+    const handleLoadMore = async () => {
+        if (isLoadingMore) return;
+        setIsLoadingMore(true);
+        try {
+            const { TransactionService } = await import('../services/transaction.service');
+            const lastTransaction = allTransactions[allTransactions.length - 1];
+            if (!lastTransaction) return;
+
+            const more = await TransactionService.fetchHistory(lastTransaction.date, 50);
+            if (more.length > 0) {
+                setArchives(prev => [...prev, ...more]);
+            } else {
+                alert("Daha fazla kayıt bulunamadı.");
+            }
+        } catch (error) {
+            console.error("Geçmiş yüklenirken hata:", error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    };
+
     // Explicitly casting the hook return to any to avoid complex typing for now, or assume it matches.
     // Ideally we type the hook, but for this migration step focusing on the page is key.
     const {
@@ -46,7 +87,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, quickActions,
         applyQuickAction,
         handleDeleteQuickAction,
         handleAddQuickAction,
-    } = useTransactionLogic(transactions) as any;
+    } = useTransactionLogic(allTransactions) as any;
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-right duration-500 pb-24 px-2">
@@ -88,6 +129,8 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, quickActions,
                     filteredTotals={filteredTotals}
                     handleDeleteTransaction={handleDeleteTransaction}
                     isPatron={isPatron}
+                    onLoadMore={handleLoadMore}
+                    isLoadingMore={isLoadingMore}
                 />
             </div>
 

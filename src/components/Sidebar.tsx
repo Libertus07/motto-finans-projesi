@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import {
     LayoutDashboard, FileText, Coffee, ChefHat, Coins,
     BarChart3, MessageSquare, Settings,
@@ -9,15 +10,16 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { THEME } from '../utils/constants';
 
+import { usePermissions } from '../hooks/usePermissions';
+import { PERMISSIONS, ROLE_LABELS } from '../utils/roles';
+
 interface SidebarProps {
-    activeTab: string;
-    setActiveTab: (tab: string) => void;
     isMobile: boolean;
     setIsMobileMenuOpen: (isOpen: boolean) => void;
-    userRole: string;
+    userRole?: string; // Made optional as we use hook now
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, userRole }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isMobile, setIsMobileMenuOpen, userRole }) => {
 
     // Çıkış Modalı State'i
     const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -39,25 +41,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobile, se
         }
     };
 
+    const { hasPermission, userRole: currentRole } = usePermissions(userRole);
+
     const menuItems = [
-        { id: 'dashboard', label: 'Genel Bakış', icon: LayoutDashboard, roles: ['patron'] },
-        { id: 'zreport', label: 'Z Raporu', icon: FileText, roles: ['patron'] },
-        { id: 'pos', label: 'Satış Terminali', icon: MonitorCheck, roles: ['patron', 'kasiyer'] },
-        { id: 'tables', label: 'Masa Yönetimi', icon: LayoutGrid, roles: ['patron', 'kasiyer', 'garson'] },
-        { id: 'transactions', label: 'Kasa Hareketleri', icon: Wallet, roles: ['patron', 'kasiyer'] },
-        { id: 'debts', label: 'Veresiye Defteri', icon: ScrollText, roles: ['patron', 'kasiyer'] },
-        { id: 'customerDirectory', label: 'Müşteri Rehberi', icon: Users, roles: ['patron'] },
-        { id: 'products', label: 'Menü & Ürün', icon: Coffee, roles: ['patron', 'kasiyer', 'garson'] },
-        { id: 'inventory', label: 'Stok & Tedarikçi', icon: Package, roles: ['patron'] },
-        { id: 'staff', label: 'Personel Yönetimi', icon: Users, roles: ['patron'] },
-        { id: 'recipe', label: 'Maliyet & Reçete', icon: ChefHat, roles: ['patron'] },
-        { id: 'investments', label: 'Varlıklar', icon: Coins, roles: ['patron'] },
-        { id: 'stats', label: 'Raporlar', icon: BarChart3, roles: ['patron'] },
-        { id: 'assistant', label: 'Asistan (AI)', icon: MessageSquare, roles: ['patron'] },
-        { id: 'settings', label: 'Ayarlar', icon: Settings, roles: ['patron', 'kasiyer', 'garson'] },
+        { id: 'dashboard', label: 'Genel Bakış', icon: LayoutDashboard, permission: PERMISSIONS.VIEW_FINANCIALS },
+        { id: 'zreport', label: 'Z Raporu', icon: FileText, permission: PERMISSIONS.VIEW_FINANCIALS },
+        { id: 'pos', label: 'Satış Terminali', icon: MonitorCheck, permission: PERMISSIONS.POS_ACCESS },
+        { id: 'tables', label: 'Masa Yönetimi', icon: LayoutGrid, permission: PERMISSIONS.TABLE_VIEW },
+        { id: 'transactions', label: 'Kasa Hareketleri', icon: Wallet, permission: PERMISSIONS.TRANSACTION_MANAGE }, // Kasiyer/Patron
+        { id: 'debts', label: 'Veresiye Defteri', icon: ScrollText, permission: PERMISSIONS.TRANSACTION_MANAGE },
+        { id: 'customerDirectory', label: 'Müşteri Rehberi', icon: Users, permission: PERMISSIONS.MANAGE_CUSTOMERS },
+        { id: 'products', label: 'Menü & Ürün', icon: Coffee, permission: PERMISSIONS.ORDER_CREATE }, // Everyone
+        { id: 'inventory', label: 'Stok & Tedarikçi', icon: Package, permission: PERMISSIONS.INVENTORY_MANAGE },
+        { id: 'staff', label: 'Personel Yönetimi', icon: Users, permission: PERMISSIONS.STAFF_MANAGE },
+        { id: 'recipe', label: 'Maliyet & Reçete', icon: ChefHat, permission: PERMISSIONS.RECIPE_MANAGE },
+        { id: 'investments', label: 'Varlıklar', icon: Coins, permission: PERMISSIONS.VIEW_FINANCIALS },
+        { id: 'stats', label: 'Raporlar', icon: BarChart3, permission: PERMISSIONS.REPORT_VIEW },
+        { id: 'assistant', label: 'Asistan (AI)', icon: MessageSquare, permission: PERMISSIONS.VIEW_FINANCIALS },
+        { id: 'settings', label: 'Ayarlar', icon: Settings, permission: PERMISSIONS.ORDER_CREATE }, // Everyone creates orders so everyone accesses basic settings
     ];
 
-    const visibleItems = menuItems.filter(item => item.roles.includes(userRole));
+    const visibleItems = menuItems.filter(item => hasPermission(item.permission));
 
     return (
         <>
@@ -76,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobile, se
                             MOTTO <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">POS</span>
                         </h1>
                         <p className="text-[10px] text-slate-500 font-bold tracking-[0.2em] uppercase">
-                            {userRole === 'patron' ? 'Yönetim Paneli' : (userRole === 'kasiyer' ? 'Kasiyer Terminali' : 'Garson Terminali')}
+                            {ROLE_LABELS[currentRole] || 'Kullanıcı'}
                         </p>
                     </div>
                     <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 hover:text-white">
@@ -86,26 +90,28 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobile, se
 
                 {/* MENÜ */}
                 <div className="flex-1 overflow-y-auto py-4 space-y-1 px-3 custom-scrollbar">
-                    {visibleItems.map(item => {
-                        const isActive = activeTab === item.id;
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => { setActiveTab(item.id); if (isMobile) setIsMobileMenuOpen(false); }}
-                                className={`
+                    {visibleItems.map(item => (
+                        <NavLink
+                            key={item.id}
+                            to={item.id}
+                            onClick={() => isMobile && setIsMobileMenuOpen(false)}
+                            className={({ isActive }) => `
                         w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium
                         ${isActive
-                                        ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-lg shadow-indigo-500/20'
-                                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                                    }
+                                    ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-lg shadow-indigo-500/20'
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                }
                     `}
-                            >
-                                <item.icon size={20} className={isActive ? 'text-white' : 'text-slate-500'} />
-                                <span>{item.label}</span>
-                                {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>}
-                            </button>
-                        );
-                    })}
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    <item.icon size={20} className={isActive ? 'text-white' : 'text-slate-500'} />
+                                    <span>{item.label}</span>
+                                    {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>}
+                                </>
+                            )}
+                        </NavLink>
+                    ))}
                 </div>
 
                 {/* ALT ÇIKIŞ ALANI */}

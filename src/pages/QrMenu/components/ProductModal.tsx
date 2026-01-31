@@ -1,183 +1,318 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Clock, Star, Info, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { X, Plus, Info, Leaf, Flame, Sparkles, Star } from 'lucide-react';
 import { Product } from '../../../types';
-import { getProductImage } from '../../../utils/imageHelpers';
 
 interface ProductModalProps {
     product: Product | null;
+    isOpen: boolean;
     onClose: () => void;
-    onAddToCart: (product: Product, options: any, e?: React.MouseEvent) => void;
+    onAddToCart: (product: Product, options: any) => void;
     t: (key: string) => string;
-    relatedProduct?: Product | null;
 }
 
-const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onAddToCart, t, relatedProduct }) => {
-    const [productOptions, setProductOptions] = useState<{ size: string | null; extras: any[]; sugar: string | null; notes: string; }>({ size: 'medium', extras: [], sugar: 'normal', notes: '' });
-    const [activeTab, setActiveTab] = useState<'details' | 'ingredients'>('details');
-    const [isAnimating, setIsAnimating] = useState(false);
+const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose, onAddToCart, t }) => {
+    // --- 3D TILT LOGIC (Hooks Must Run Always) ---
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
 
+    const mouseXSpring = useSpring(x);
+    const mouseYSpring = useSpring(y);
+
+    // RotateX follows Y-axis movement, RotateY follows X-axis movement
+    const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["10deg", "-10deg"]);
+    const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-10deg", "10deg"]);
+
+    const [selectedSize, setSelectedSize] = useState('Standart');
+    const [activeTab, setActiveTab] = useState<'details' | 'ingredients'>('details');
+    const [specialNote, setSpecialNote] = useState('');
+
+    // Update state when product changes
     useEffect(() => {
         if (product) {
-            const timer = setTimeout(() => setIsAnimating(true), 50);
-            return () => clearTimeout(timer);
-        } else {
-            const timer = setTimeout(() => setIsAnimating(false), 50);
-            return () => clearTimeout(timer);
+            setSelectedSize('Standart');
+            setActiveTab('details');
+            setSpecialNote('');
         }
     }, [product]);
 
+    // Return null ONLY after hooks
     if (!product) return null;
 
-    const handleAdd = (e: React.MouseEvent) => {
-        onAddToCart(product, productOptions, e);
-        // Optional: Close modal after add? For now let's keep it open or rely on parent.
-        // Usually better to give feedback and close or let user add more.
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const xPct = mouseX / width - 0.5;
+        const yPct = mouseY / height - 0.5;
+        x.set(xPct);
+        y.set(yPct);
+    };
+
+    const handleMouseLeave = () => {
+        x.set(0);
+        y.set(0);
+    };
+
+    const handleAdd = () => {
+        onAddToCart(product, {
+            size: selectedSize,
+            note: specialNote
+        });
         onClose();
     };
 
-    const handleAddRelated = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (relatedProduct) {
-            // Add related product with default options
-            onAddToCart(relatedProduct, { size: 'medium', notes: 'Hızlı Ekleme (Öneri)' }, e);
-        }
+    const getProductImage = (p: Product) => {
+        if (p.image) return p.image;
+        return 'https://images.unsplash.com/photo-1544787210-28274d6c66cf?w=800&q=80';
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 perspective-1000" onClick={onClose}>
-            <div className={`absolute inset-0 bg-[#1a110d]/60 backdrop-blur-md transition-opacity duration-500 ${isAnimating ? 'opacity-100' : 'opacity-0'}`} />
-
-            <div
-                className={`w-full max-w-md bg-[#FDFBF7] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden relative transform transition-all duration-500 ease-out ${isAnimating ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'}`}
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Parallax Image Header */}
-                <div className="relative h-80 overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-[#FDFBF7] z-10" />
-                    <img
-                        src={getProductImage(product)}
-                        alt={product.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <button
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-hidden perspective-1000">
+                    {/* Backdrop */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="absolute top-4 right-4 z-20 w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/40 transition-all border border-white/10 active:scale-95"
+                        className="absolute inset-0 bg-[#050302]/85 backdrop-blur-xl"
+                    />
+
+                    {/* 3D Card Container */}
+                    <motion.div
+                        style={{
+                            rotateX,
+                            rotateY,
+                            transformStyle: "preserve-3d",
+                        }}
+                        initial={{ opacity: 0, scale: 0.9, y: 50 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: 50 }}
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={handleMouseLeave}
+                        className="relative w-full max-w-lg bg-[#FDFBF7] rounded-[3rem] shadow-[0_50px_100px_rgba(0,0,0,0.6)] overflow-hidden border border-[#D4AF37]/20 group/modal"
                     >
-                        <X size={20} />
-                    </button>
-
-                    {/* Badge */}
-                    <div className="absolute top-4 left-4 z-20 flex gap-2">
-                        {product.isVegan && <span className="px-3 py-1 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">VEGAN</span>}
-                        {product.price > 100 && <span className="px-3 py-1 bg-[#D4AF37]/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">PREMIUM</span>}
-                    </div>
-                </div>
-
-                {/* Content Container */}
-                <div className="relative z-20 -mt-12 px-6 pb-6">
-                    {/* Header Info */}
-                    <div className="flex justify-between items-start mb-6">
-                        <div className="flex-1 mr-4">
-                            <h2 className="text-3xl font-black text-[#432818] font-cinzel leading-none mb-2">{product.name}</h2>
-                            <div className="flex items-center gap-2 text-[#432818]/40 text-xs font-bold tracking-wider">
-                                <Clock size={12} />
-                                <span>15-20 DK</span>
-                                <span className="mx-1">•</span>
-                                <Star size={12} className="text-[#D4AF37]" fill="currentColor" />
-                                <span>4.9</span>
-                            </div>
-                        </div>
-                        <div className="bg-[#432818] text-[#D4AF37] px-4 py-3 rounded-2xl shadow-xl shadow-[#432818]/20 flex flex-col items-center min-w-[80px]">
-                            <span className="text-xs font-bold opacity-80">Fiyat</span>
-                            <span className="text-xl font-black font-cinzel">{product.price} ₺</span>
-                        </div>
-                    </div>
-
-                    {/* Tabs (Visual Only for now) */}
-                    <div className="flex gap-6 border-b border-[#432818]/5 mb-6">
-                        <button
-                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'details' ? 'text-[#432818] border-b-2 border-[#432818]' : 'text-[#432818]/40'}`}
-                            onClick={() => setActiveTab('details')}
-                        >
-                            Detaylar
-                        </button>
-                        <button
-                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ingredients' ? 'text-[#432818] border-b-2 border-[#432818]' : 'text-[#432818]/40'}`}
-                            onClick={() => setActiveTab('ingredients')}
-                        >
-                            İçerik
-                        </button>
-                    </div>
-
-                    <div className="space-y-6">
-                        <p className="text-[#432818]/70 text-sm leading-relaxed font-medium">
-                            {product.description}
-                        </p>
-
-                        {/* Special Requests */}
-                        <div className="bg-[#F7F3F0] rounded-2xl p-4 border border-[#432818]/5">
-                            <label className="flex items-center gap-2 text-xs font-black text-[#432818] uppercase tracking-wider mb-3">
-                                <Edit3 size={12} className="text-[#BB9457]" />
-                                {t('special_note')}
-                            </label>
-                            <textarea
-                                value={productOptions.notes}
-                                onChange={e => setProductOptions({ ...productOptions, notes: e.target.value })}
-                                className="w-full bg-white rounded-xl p-3 text-sm text-[#432818] placeholder:text-[#432818]/20 outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-all resize-none border-none shadow-sm"
-                                placeholder={t('note_placeholder')}
-                                rows={2}
+                        {/* --- Divine Glow Overlay --- */}
+                        <div className="absolute inset-0 pointer-events-none z-50">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-[#D4AF37]/10 opacity-0 group-hover/modal:opacity-100 transition-opacity duration-700" />
+                            <div
+                                className="absolute w-full h-full opacity-0 group-hover/modal:opacity-20 transition-opacity duration-500"
+                                style={{
+                                    background: 'linear-gradient(135deg, transparent 25%, rgba(212,175,55,0.4) 50%, transparent 75%)',
+                                    backgroundSize: '200% 200%',
+                                    animation: 'shimmer 3s infinite linear'
+                                }}
                             />
                         </div>
 
-                        {/* Related Product / Upsell */}
-                        {relatedProduct && (
-                            <div className="relative overflow-hidden rounded-2xl bg-[#432818] text-[#FDFBF7] p-4 shadow-lg isolate">
-                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                                <div className="relative flex items-center justify-between gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <img src={getProductImage(relatedProduct)} alt="Upsell" className="w-12 h-12 rounded-xl object-cover ring-2 ring-[#D4AF37]/50" />
-                                        <div>
-                                            <p className="text-[10px] text-[#D4AF37] font-black uppercase tracking-widest mb-0.5">Yanına İyi Gider</p>
-                                            <h4 className="font-cinzel font-bold text-sm leading-none">{relatedProduct.name}</h4>
-                                            <p className="text-xs opacity-60 mt-0.5">{relatedProduct.price} ₺</p>
-                                        </div>
+                        {/* --- Close Button --- */}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-6 right-6 z-[60] w-12 h-12 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-black/40 transition-all border border-white/10 group/close"
+                        >
+                            <X size={24} className="group-hover/close:rotate-90 transition-transform duration-300" />
+                        </button>
+
+                        {/* --- Floating Badges (3D) --- */}
+                        <div className="absolute top-8 left-8 z-[60] flex flex-col gap-3 pointer-events-none" style={{ transform: "translateZ(60px)" }}>
+                            {product.isVegan && (
+                                <motion.div
+                                    initial={{ x: -20, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    className="bg-emerald-500/90 backdrop-blur-md text-white px-4 py-2 rounded-full shadow-[0_8px_20px_rgba(16,185,129,0.3)] border border-white/20 flex items-center gap-2 rotate-[-2deg]"
+                                >
+                                    <Leaf size={14} fill="currentColor" />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] font-cinzel">VEGAN</span>
+                                </motion.div>
+                            )}
+                            {product.isGlutenFree && (
+                                <motion.div
+                                    initial={{ x: -20, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    transition={{ delay: 0.1 }}
+                                    className="bg-[#D4AF37] backdrop-blur-md text-[#432818] px-4 py-2 rounded-full shadow-[0_8px_20px_rgba(212,175,55,0.3)] border border-white/40 flex items-center gap-2 rotate-[1deg]"
+                                >
+                                    <Sparkles size={14} fill="currentColor" />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] font-cinzel">CHEF'S CHOICE</span>
+                                </motion.div>
+                            )}
+                        </div>
+
+                        {/* --- Image Section (3D) --- */}
+                        <div className="relative h-72 overflow-hidden bg-[#1a110d]" style={{ transform: "translateZ(30px)" }}>
+                            <motion.img
+                                src={getProductImage(product)}
+                                alt={product.name}
+                                className="w-full h-full object-cover scale-110 group-hover/modal:scale-125 transition-transform duration-[2s] ease-out opacity-90"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7]/20 to-transparent z-10" />
+
+                            {/* Product Info Floating Overlay */}
+                            <div className="absolute bottom-4 inset-x-8 z-20">
+                                <motion.h2
+                                    className="text-4xl font-black text-[#432818] font-cinzel leading-tight tracking-tight mb-2"
+                                    style={{ transform: "translateZ(70px)" }}
+                                >
+                                    {product.name}
+                                </motion.h2>
+                                <div className="flex items-center gap-4" style={{ transform: "translateZ(50px)" }}>
+                                    <div className="bg-[#432818] text-[#D4AF37] px-4 py-1.5 rounded-full shadow-lg">
+                                        <span className="font-black text-xl font-cinzel">₺{product.price}</span>
                                     </div>
-                                    <button
-                                        onClick={handleAddRelated}
-                                        className="bg-[#D4AF37] text-[#432818] p-2 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg"
-                                    >
-                                        <Plus size={18} strokeWidth={3} />
-                                    </button>
+                                    <span className="text-[#432818]/60 text-xs font-black uppercase tracking-[0.3em] font-cinzel">{product.category}</span>
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        </div>
 
-                    {/* Action Button */}
-                    <div className="mt-8 pt-4 border-t border-[#432818]/5">
-                        <button
-                            onClick={handleAdd}
-                            className="w-full bg-[#432818] text-[#D4AF37] py-5 rounded-2xl font-black text-lg font-cinzel tracking-wider shadow-2xl shadow-[#432818]/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-3 relative overflow-hidden group"
-                        >
-                            <span className="relative z-10">{t('add_to_cart')}</span>
-                            <div className="w-8 h-8 bg-[#D4AF37] text-[#432818] rounded-full flex items-center justify-center relative z-10 group-hover:rotate-90 transition-transform duration-300">
-                                <Plus size={20} />
+                        {/* --- Content Section --- */}
+                        <div className="bg-[#FDFBF7] px-8 py-6 pb-36 space-y-8" style={{ transform: "translateZ(20px)" }}>
+                            {/* Tabs */}
+                            <div className="flex gap-8 border-b border-[#432818]/5">
+                                {[
+                                    { id: 'details', label: t('details'), icon: Info },
+                                    { id: 'ingredients', label: t('nutrition'), icon: Flame }
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={`pb-4 text-xs font-black uppercase tracking-[0.25em] font-cinzel flex items-center gap-2.5 transition-all relative ${activeTab === tab.id ? 'text-[#D4AF37]' : 'text-[#432818]/30 hover:text-[#432818]/60'
+                                            }`}
+                                    >
+                                        <tab.icon size={16} strokeWidth={2.5} />
+                                        {tab.label}
+                                        {activeTab === tab.id && (
+                                            <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-[#D4AF37] rounded-full shadow-[0_0_10px_rgba(212,175,55,0.5)]" />
+                                        )}
+                                    </button>
+                                ))}
                             </div>
-                            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        </button>
-                    </div>
+
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={activeTab}
+                                    initial={{ opacity: 0, x: 10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -10 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="min-h-[220px]"
+                                >
+                                    {activeTab === 'details' ? (
+                                        <div className="space-y-8">
+                                            <p className="text-[#432818]/70 text-base leading-relaxed font-medium font-serif italic">
+                                                "{product.description || "Bu ürün özel Motto tarifleri ile hazırlanmış, taze ve kaliteli malzemeler içeren eşsiz bir lezzettir."}"
+                                            </p>
+
+                                            <div className="grid grid-cols-2 gap-6">
+                                                <div className="space-y-4">
+                                                    <label className="text-[10px] font-black text-[#D4AF37] uppercase tracking-[0.3em] font-cinzel block">Porsiyon</label>
+                                                    <div className="flex gap-3">
+                                                        {['Standart', 'Büyük'].map((size) => (
+                                                            <button
+                                                                key={size}
+                                                                onClick={() => setSelectedSize(size)}
+                                                                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${selectedSize === size
+                                                                        ? 'bg-[#432818] text-[#D4AF37] border-[#432818] shadow-[0_10px_20px_rgba(67,40,24,0.2)]'
+                                                                        : 'bg-white text-[#432818]/40 border-[#432818]/5 hover:border-[#D4AF37]/30'
+                                                                    }`}
+                                                            >
+                                                                {size}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <label className="text-[10px] font-black text-[#D4AF37] uppercase tracking-[0.3em] font-cinzel block">Özel Not</label>
+                                                <textarea
+                                                    placeholder="Şeker oranı, alerji uyarısı vb..."
+                                                    value={specialNote}
+                                                    onChange={(e) => setSpecialNote(e.target.value)}
+                                                    className="w-full bg-[#f8f5f0] border-2 border-transparent rounded-[1.5rem] p-5 text-sm font-medium focus:ring-0 focus:border-[#D4AF37]/30 transition-all resize-none min-h-[120px] placeholder-[#432818]/30"
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-6">
+                                            {[
+                                                { label: 'Kalori', value: product.calories?.toString() || '320', unit: 'kcal', icon: Flame, color: 'text-orange-500' },
+                                                { label: 'Protein', value: '12', unit: 'g', icon: Star, color: 'text-blue-500' },
+                                                { label: 'Karbonhidrat', value: '45', unit: 'g', icon: Sparkles, color: 'text-emerald-500' },
+                                                { label: 'Yağ', value: '8', unit: 'g', icon: Leaf, color: 'text-amber-500' },
+                                            ].map((stat) => (
+                                                <div key={stat.label} className="bg-white border-2 border-[#432818]/5 p-5 rounded-[2rem] hover:border-[#D4AF37]/20 transition-all group/stat">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <stat.icon size={14} className={`${stat.color} opacity-60 group-hover/stat:opacity-100 transition-opacity`} />
+                                                        <span className="text-[10px] font-black text-[#432818]/40 uppercase tracking-widest">{stat.label}</span>
+                                                    </div>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-2xl font-black text-[#432818] font-cinzel">{stat.value}</span>
+                                                        <span className="text-[10px] font-black text-[#432818]/40 uppercase">{stat.unit}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
+                        </div>
+
+                        {/* --- Sticky Footer (3D) --- */}
+                        <div className="absolute bottom-0 inset-x-0 p-8 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7] to-transparent pt-16 z-[70]">
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleAdd}
+                                disabled={product.stock !== undefined && product.stock <= 0}
+                                className={`w-full py-6 rounded-[2rem] font-black text-xl font-cinzel tracking-[0.2em] shadow-[0_25px_50px_rgba(67,40,24,0.3)] flex items-center justify-center gap-5 relative overflow-hidden group/btn transition-all ${product.stock !== undefined && product.stock <= 0
+                                        ? 'bg-slate-400 text-white cursor-not-allowed opacity-80'
+                                        : 'bg-[#432818] text-[#D4AF37] border border-white/10'
+                                    }`}
+                                style={{ transform: "translateZ(80px)" }}
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-[1.5s] ease-in-out" />
+
+                                <span className="relative z-10">
+                                    {product.stock !== undefined && product.stock <= 0 ? 'TÜKENDİ' : t('add_to_cart')}
+                                </span>
+
+                                {!(product.stock !== undefined && product.stock <= 0) && (
+                                    <div className="w-12 h-12 bg-[#D4AF37] text-[#432818] rounded-full flex items-center justify-center relative z-10 group-hover/btn:rotate-90 transition-transform duration-500 shadow-[0_0_20px_rgba(212,175,55,0.4)]">
+                                        <Plus size={28} strokeWidth={3} />
+                                    </div>
+                                )}
+                            </motion.button>
+                        </div>
+                    </motion.div>
                 </div>
-            </div>
-        </div>
+            )}
+
+            {/* CSS for Shimmer Animation */}
+            <style>{`
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(67, 40, 24, 0.1);
+          border-radius: 10px;
+        }
+      `}</style>
+        </AnimatePresence>
     );
 };
-
-// Helper Icon
-const Edit3 = ({ size, className }: { size: number, className?: string }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-    </svg>
-);
 
 export default ProductModal;

@@ -54,8 +54,9 @@ const OccupancyChart: React.FC<OccupancyChartProps> = ({
 
                     {/* Sol: Durum Etiketi */}
                     <div className="flex flex-col justify-center z-10">
-                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest mb-1 w-fit ${isDarkMode ? 'bg-[#1e293b]' : 'bg-white'} ${occupancyConfig.text} border-current opacity-90`}>
-                            <div className={`w-1.5 h-1.5 rounded-full ${occupancyConfig.text.replace('text-', 'bg-')} animate-pulse`}></div>
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest mb-1 w-fit shadow-sm 
+                            ${isDarkMode ? 'bg-slate-900 border-current/30' : 'bg-white border-current/50'} ${occupancyConfig.text} opacity-100`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${occupancyConfig.text.replace('text-', 'bg-')} animate-pulse shadow-sm`} />
                             {occupancyConfig.label}
                         </div>
                         <div className="flex items-baseline gap-1">

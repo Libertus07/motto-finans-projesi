@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, limit } from 'firebase/firestore';
-import { db, appId } from '../../services/firebase';
-import { SHOP_ID } from '../../utils/constants';
 import { Transaction, Investment, Debt, Ingredient, QuickAction, User } from '../../types';
+import { TransactionService } from '../../services/transaction.service';
+import { FinanceService } from '../../services/finance.service';
 
 export function useFinancials(user: User | null | undefined) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -14,35 +13,45 @@ export function useFinancials(user: User | null | undefined) {
 
     useEffect(() => {
         if (!user) {
-            // If no user, we are done loading (no data to fetch)
-            setLoading(false);
-            return;
+            // Already false? or just ensure it is false
+            const t = setTimeout(() => setLoading(false), 0);
+            return () => clearTimeout(t);
         }
 
         const unsubscribers: (() => void)[] = [];
 
         // 1. TRANSACTIONS
-        unsubscribers.push(onSnapshot(query(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'transactions'), limit(500)), (s) => {
-            setTransactions(s.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)).sort((a, b) => b.date.localeCompare(a.date)));
-        }, (error) => {
-            // console.error("❌ İŞLEM OKUMA HATASI:", error)
-        }));
+        unsubscribers.push(
+            TransactionService.subscribeToRecent(500, (data) => setTransactions(data))
+        );
 
         // 2. INVESTMENTS
-        unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'investments'), s => setInvestments(s.docs.map(d => ({ id: d.id, ...d.data() } as Investment)))));
+        unsubscribers.push(
+            FinanceService.subscribeToInvestments((data) => setInvestments(data))
+        );
 
         // 3. DEBTS
-        unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'debts'), s => setDebts(s.docs.map(d => ({ id: d.id, ...d.data() } as Debt)))));
+        unsubscribers.push(
+            FinanceService.subscribeToDebts((data) => setDebts(data))
+        );
 
         // 4. INGREDIENTS
-        unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'ingredients'), s => setIngredients(s.docs.map(d => ({ id: d.id, ...d.data() } as Ingredient)))));
+        unsubscribers.push(
+            FinanceService.subscribeToIngredients((data) => setIngredients(data))
+        );
 
         // 5. QUICK ACTIONS
-        unsubscribers.push(onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'quickActions'), s => setQuickActions(s.docs.map(d => ({ id: d.id, ...d.data() } as QuickAction)))));
+        unsubscribers.push(
+            FinanceService.subscribeToQuickActions((data) => setQuickActions(data))
+        );
 
-        setLoading(false);
+        // Initial loading done (listeners registered)
+        const t = setTimeout(() => setLoading(false), 0);
 
-        return () => unsubscribers.forEach(unsub => unsub());
+        return () => {
+            clearTimeout(t);
+            unsubscribers.forEach(unsub => unsub());
+        };
     }, [user]);
 
     return { transactions, investments, debts, ingredients, quickActions, loading };

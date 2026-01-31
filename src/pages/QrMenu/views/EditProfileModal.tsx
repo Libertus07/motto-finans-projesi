@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { X, Loader2, Ticket } from 'lucide-react';
+import { doc, updateDoc, collection, query, where, getDocs, increment, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, appId } from '../../../services/firebase';
 import { SHOP_ID } from '../../../utils/constants';
 import { CustomerProfile } from '../../../types';
@@ -10,9 +10,11 @@ interface EditProfileModalProps {
     onClose: () => void;
     customerProfile: CustomerProfile | null;
     showToast: (message: string, type: 'success' | 'error' | 'info') => void;
+    referrerReward: number;
+    refereeReward: number;
 }
 
-const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, customerProfile, showToast }) => {
+const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, customerProfile, showToast, referrerReward, refereeReward }) => {
     const [formData, setFormData] = useState({
         firstName: customerProfile?.firstName || '',
         lastName: customerProfile?.lastName || '',
@@ -20,7 +22,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, cu
         phone: customerProfile?.phone || '',
         birthday: customerProfile?.birthday || ''
     });
+    const [inviteCode, setInviteCode] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [isRedeeming, setIsRedeeming] = useState(false);
 
     useEffect(() => {
         if (isOpen && customerProfile) {
@@ -66,6 +70,72 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, cu
             showToast('Profil güncellenirken hata oluştu.', 'error');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleRedeemCode = async () => {
+        if (!auth.currentUser || !inviteCode || inviteCode.length < 6) return;
+
+        // Basic check: don't allow own code
+        if (customerProfile?.personalInviteCode === inviteCode.toUpperCase()) {
+            showToast('Kendi davet kodunuzu kullanamazsınız.', 'error');
+            return;
+        }
+
+        setIsRedeeming(true);
+        try {
+            const customersRef = collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'customers');
+            const q = query(customersRef, where('personalInviteCode', '==', inviteCode.toUpperCase().trim()));
+            const snapshot = await getDocs(q);
+
+            if (snapshot.empty) {
+                showToast('Geçersiz davet kodu.', 'error');
+                setIsRedeeming(false);
+                return;
+            }
+
+            const referrerDoc = snapshot.docs[0];
+            const referrerData = referrerDoc.data();
+
+            // Distribute Rewards
+
+            // 1. Reward Referrer
+            await updateDoc(referrerDoc.ref, {
+                points: increment(referrerReward),
+                referralCount: increment(1)
+            });
+            await addDoc(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'transactions'), {
+                customerPhone: referrerData.phone,
+                customerId: referrerDoc.id,
+                type: 'referral_bonus',
+                points: referrerReward,
+                desc: `Arkadaş Daveti Bonusu: ${customerProfile?.firstName} 🎉`,
+                timestamp: serverTimestamp()
+            });
+
+            // 2. Reward User (Referee)
+            const userRef = doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'customers', auth.currentUser.uid);
+            await updateDoc(userRef, {
+                referredBy: inviteCode.toUpperCase().trim(),
+                points: increment(refereeReward)
+            });
+            await addDoc(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'transactions'), {
+                customerPhone: customerProfile?.phone,
+                customerId: auth.currentUser.uid,
+                type: 'gift',
+                points: refereeReward,
+                desc: 'Davet Kodu Kullanımı 🎁',
+                timestamp: serverTimestamp()
+            });
+
+            showToast(`Davet kodu onaylandı! ${refereeReward} Volt kazandınız.`, 'success');
+            onClose();
+
+        } catch (error) {
+            console.error("Redeem error:", error);
+            showToast('Kod kullanılırken hata oluştu.', 'error');
+        } finally {
+            setIsRedeeming(false);
         }
     };
 
@@ -120,6 +190,35 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, cu
                         className="w-full px-4 py-3 bg-white border border-[#432818]/10 rounded-xl outline-none focus:border-[#D4AF37] transition-all"
                     />
                 </div>
+
+                {/* Invite Code Section (Only if not referred yet) */}
+                {!customerProfile?.referredBy && (
+                    <div className="mt-6 bg-[#F9F7F5] p-4 rounded-xl border border-[#432818]/5">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Ticket size={14} className="text-[#D4AF37]" />
+                            <span className="text-xs font-black text-[#432818] uppercase tracking-wider">Davet Kodum Var</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                placeholder="Arkadaşının Kodu"
+                                value={inviteCode}
+                                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                                className="flex-1 px-3 py-2 bg-white border border-[#432818]/10 rounded-lg outline-none text-sm font-bold tracking-wider placeholder:font-medium placeholder:tracking-normal focus:border-[#D4AF37] transition-colors uppercase"
+                            />
+                            <button
+                                onClick={handleRedeemCode}
+                                disabled={isRedeeming || inviteCode.length < 6}
+                                className="bg-[#432818] text-[#D4AF37] px-4 rounded-lg font-bold text-xs disabled:opacity-50 hover:bg-[#2c1a0f] transition-colors"
+                            >
+                                {isRedeeming ? <Loader2 size={14} className="animate-spin" /> : 'KULLAN'}
+                            </button>
+                        </div>
+                        <p className="text-[10px] text-[#432818]/40 mt-2 font-medium">
+                            Kodu girerek {refereeReward} Volt kazanabilirsin.
+                        </p>
+                    </div>
+                )}
 
                 <div className="flex gap-3 mt-6">
                     <button

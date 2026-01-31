@@ -1,54 +1,62 @@
-// pages/Inventory.tsx (ORTAK HAVUZ ENTEGRASYONU ✅)
-
+// pages/Inventory.tsx
 import React, { useState, useMemo } from 'react';
-import { Truck, PlusCircle, AlertTriangle, Trash2, Box, RefreshCw, Loader2, ChefHat, Database } from 'lucide-react';
+import { Truck, PlusCircle, AlertTriangle, Trash2, Box, RefreshCw, Loader2, ChefHat, Database, TrendingUp, Search, ArrowRight, Package, DollarSign, Wallet } from 'lucide-react';
 import { addDoc, doc, collection, writeBatch, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, appId } from '../services/firebase';
 import { formatCurrency } from '../utils/helpers';
 import ConfirmationModal from '../components/ConfirmationModal';
 import InfoModal from '../components/InfoModal';
-
-// 👇 MAĞAZA ID
 import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 import { Ingredient, Debt } from '../types';
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-interface InventoryProps {
-    ingredients: Ingredient[];
-    debts: Debt[];
-}
+const Inventory: React.FC = () => {
+    const { ingredients, debts } = useOutletContext<DashboardContextType>();
 
-interface NewPurchaseState {
-    supplier: string;
-    amount: string;
-    quantity: string;
-    ingredientId: string;
-    isDebt: boolean;
-}
-
-interface NewIngredientState {
-    name: string;
-    unit: string;
-    price: string;
-    stock: string;
-}
-
-const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
+    // --- STATE ---
+    // Purchase Wizard State
+    interface NewPurchaseState {
+        supplier: string;
+        amount: string;
+        quantity: string;
+        ingredientId: string;
+        isDebt: boolean;
+    }
     const [newPurchase, setNewPurchase] = useState<NewPurchaseState>({ supplier: '', amount: '', quantity: '', ingredientId: '', isDebt: false });
     const [processing, setProcessing] = useState(false);
+
+    // New Ingredient State
+    interface NewIngredientState { name: string; unit: string; price: string; stock: string; }
     const [newIngredient, setNewIngredient] = useState<NewIngredientState>({ name: '', unit: 'kg', price: '', stock: '' });
+    const [isCreatingIngredient, setIsCreatingIngredient] = useState(false);
+
+    // Filter & Search
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // System State
     const [deleteData, setDeleteData] = useState<Ingredient | null>(null);
     const [infoModal, setInfoModal] = useState<{ isOpen: boolean; type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' });
 
+    // --- STATS ---
     const stockStats = useMemo(() => {
         const totalValue = ingredients.reduce((sum, ing) => sum + (ing.price * (ing.stock || 0)), 0);
         const lowStockCount = ingredients.filter(ing => (ing.stock || 0) < 5).length;
         const suppliers = [...new Set(debts.map(d => d.supplier).filter(s => s))];
-        return { totalValue, lowStockCount, suppliers };
+        const supplierPurchaseCounts = suppliers.reduce((acc, supplier) => {
+            // Mock calculation for demo purposes, in real app would aggregate form transactions
+            acc[supplier] = Math.floor(Math.random() * 10) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return { totalValue, lowStockCount, suppliers, supplierPurchaseCounts };
     }, [ingredients, debts]);
 
-    const lowStockIngredients = ingredients.filter(ing => (ing.stock || 0) < 5);
+    const filteredIngredients = ingredients
+        .filter(ing => ing.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        .sort((a, b) => (a.stock || 0) - (b.stock || 0)); // Sort by stock level (low to high) default
 
-    // --- HAMMADDE EKLEME (ORTAK HAVUZ) ---
+    // --- ACTIONS ---
     const handleAddIngredient = async () => {
         if (!newIngredient.name || !newIngredient.price) return;
         try {
@@ -56,6 +64,8 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
                 name: newIngredient.name, unit: newIngredient.unit, price: Number(newIngredient.price) || 0, stock: Number(newIngredient.stock) || 0, order: ingredients.length + 1
             });
             setNewIngredient({ name: '', unit: 'kg', price: '', stock: '' });
+            setIsCreatingIngredient(false);
+            setInfoModal({ isOpen: true, type: 'success', title: 'Başarılı', message: 'Yeni hammadde kartı açıldı.' });
         } catch (error) { console.error(error); }
     };
 
@@ -76,7 +86,6 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
         }
     };
 
-    // --- ALIM KAYDETME (ORTAK HAVUZ & KASA & BORÇ) ---
     const handleRecordPurchase = async () => {
         if (!newPurchase.ingredientId || !newPurchase.amount || !newPurchase.quantity || !newPurchase.supplier) {
             setInfoModal({ isOpen: true, type: 'warning', title: 'Eksik Bilgi', message: 'Lütfen tüm alanları doldurunuz.' });
@@ -85,10 +94,7 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
 
         setProcessing(true);
         const ingredient = ingredients.find(i => i.id === newPurchase.ingredientId);
-        if (!ingredient) {
-            setProcessing(false);
-            return;
-        }
+        if (!ingredient) { setProcessing(false); return; }
 
         const purchaseAmount = Number(newPurchase.amount);
         const purchaseQuantity = Number(newPurchase.quantity);
@@ -99,11 +105,9 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
             const newStock = (ingredient.stock || 0) + purchaseQuantity;
             const newPrice = purchaseAmount / purchaseQuantity;
 
-            // 1. Stoku Güncelle
             batch.update(ingRef, { stock: newStock, price: newPrice });
 
             if (newPurchase.isDebt) {
-                // 2a. Borç Olarak Kaydet (Veresiye Defteri)
                 const debtData = {
                     supplier: newPurchase.supplier, amount: purchaseAmount, dueDate: new Date().toISOString().split('T')[0],
                     note: `${ingredient.name} alımı (${purchaseQuantity} ${ingredient.unit})`, type: 'debt', createdAt: Date.now(),
@@ -111,7 +115,6 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
                 // @ts-ignore
                 batch.set(doc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'debts')), debtData);
             } else {
-                // 2b. Gider Olarak Kaydet (Kasa)
                 const transactionData = {
                     date: new Date().toISOString().split('T')[0], type: 'expense', amount: purchaseAmount,
                     desc: `${newPurchase.supplier} - ${ingredient.name} alımı`, method: 'cash', category: 'Stok (Fatura)',
@@ -121,7 +124,6 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
             }
             await batch.commit();
             setNewPurchase({ supplier: '', amount: '', quantity: '', ingredientId: '', isDebt: false });
-
             setInfoModal({ isOpen: true, type: 'success', title: 'Alım Kaydedildi', message: `${purchaseQuantity} ${ingredient.unit} ${ingredient.name} stoğa eklendi.` });
 
         } catch (error) {
@@ -132,76 +134,284 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, debts }) => {
         }
     };
 
+    // Helper: Stock Color
+    const getStockColor = (stock: number) => {
+        if (stock <= 0) return 'bg-red-500';
+        if (stock < 5) return 'bg-orange-500';
+        if (stock < 20) return 'bg-yellow-500';
+        return 'bg-emerald-500';
+    };
+
+    const getStockWidth = (stock: number) => Math.min(100, Math.max(5, stock * 2)); // Dynamic width
+
     return (
-        <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+        <div className="min-h-screen bg-[#0f172a] text-slate-200 p-4 md:p-8 font-sans">
+            {/* Background Ambience */}
+            <div className="fixed inset-0 pointer-events-none">
+                <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-b from-blue-900/10 to-transparent opacity-60" />
+                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-900/10 rounded-full blur-3xl opacity-40" />
+            </div>
+
             <ConfirmationModal isOpen={!!deleteData} onClose={() => setDeleteData(null)} onConfirm={confirmDelete} title="Hammaddeyi Sil" message={`"${deleteData?.name}" adlı hammaddeyi silmek istediğinize emin misiniz?`} loading={false} />
             <InfoModal isOpen={infoModal.isOpen} onClose={() => setInfoModal({ ...infoModal, isOpen: false })} type={infoModal.type} title={infoModal.title} message={infoModal.message} />
 
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Truck className="text-orange-400" /> Stok & Tedarikçi Yönetimi</h2>
-                <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-right"><div className="text-xs text-slate-400 font-bold uppercase">Toplam Stok Değeri</div><div className="text-xl font-bold text-emerald-400">{formatCurrency(stockStats.totalValue)} ₺</div></div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-fit lg:col-span-1">
-                    <div className="mb-6 pb-4 border-b border-slate-700/50">
-                        <h3 className="font-bold text-white mb-3 flex items-center gap-2"><ChefHat size={18} className="text-emerald-400" /> Yeni Hammadde Tanımla</h3>
-                        <div className="space-y-2">
-                            <input type="text" placeholder="Adı (Örn: Badem Şurubu)" value={newIngredient.name} onChange={(e) => setNewIngredient({ ...newIngredient, name: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm outline-none focus:border-emerald-500" />
-                            <div className="flex gap-2">
-                                <input type="number" placeholder="Birim Fiyat (TL)" value={newIngredient.price} onChange={(e) => setNewIngredient({ ...newIngredient, price: e.target.value })} className="w-1/3 bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm outline-none focus:border-emerald-500" />
-                                <select value={newIngredient.unit} onChange={(e) => setNewIngredient({ ...newIngredient, unit: e.target.value })} className="w-1/3 bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm outline-none focus:border-emerald-500"><option>kg</option><option>Litre</option><option>Adet</option></select>
-                                <input type="number" placeholder="İlk Stok" value={newIngredient.stock} onChange={(e) => setNewIngredient({ ...newIngredient, stock: e.target.value })} className="w-1/3 bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm outline-none focus:border-emerald-500" />
+            <div className="max-w-[1600px] mx-auto relative z-10">
+                {/* HEADER */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4 border-b border-slate-800/60 pb-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
+                                <Box size={28} className="text-white" />
                             </div>
-                            <button onClick={handleAddIngredient} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg">HAMMADDE EKLE</button>
+                            <h1 className="text-3xl lg:text-4xl font-black text-white tracking-tight">Stok Stüdyosu</h1>
                         </div>
+                        <p className="text-slate-400 font-medium max-w-lg">
+                            Hammadde akışını yönetin, alımları kaydedin ve depo değerinizi anlık takip edin.
+                        </p>
                     </div>
 
-                    <h3 className="font-bold text-white mb-4 flex items-center gap-2"><PlusCircle size={18} className="text-indigo-400" /> Yeni Alım Kaydet</h3>
-                    <div className="space-y-3">
-                        <div><label className="text-xs text-slate-400 block mb-1">Hammadde</label><select value={newPurchase.ingredientId} onChange={(e) => setNewPurchase({ ...newPurchase, ingredientId: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-indigo-500"><option value="">Seçiniz</option>{ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>)}</select></div>
-                        <div><label className="text-xs text-slate-400 block mb-1">Tedarikçi</label><input type="text" placeholder="Örn: Sütçü Ahmet" list="supplier-list" value={newPurchase.supplier} onChange={(e) => setNewPurchase({ ...newPurchase, supplier: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-indigo-500" /><datalist id="supplier-list">{stockStats.suppliers.map(s => <option key={s} value={s} />)}</datalist></div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-xs text-slate-400 block mb-1">Miktar</label><input type="number" placeholder="0" value={newPurchase.quantity} onChange={(e) => setNewPurchase({ ...newPurchase, quantity: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-indigo-500" /></div>
-                            <div><label className="text-xs text-slate-400 block mb-1">Toplam Tutar</label><input type="number" placeholder="0.00" value={newPurchase.amount} onChange={(e) => setNewPurchase({ ...newPurchase, amount: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-indigo-500" /></div>
+                    <div className="flex gap-6">
+                        <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm min-w-[200px]">
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                <Wallet size={14} className="text-emerald-400" />
+                                Depo Değeri
+                            </div>
+                            <div className="text-3xl font-black text-white tracking-tight">{formatCurrency(stockStats.totalValue)} <span className="text-lg text-slate-500">₺</span></div>
                         </div>
-                        <div className="flex items-center gap-4 pt-2">
-                            <input type="checkbox" id="isDebt" checked={newPurchase.isDebt} onChange={(e) => setNewPurchase({ ...newPurchase, isDebt: e.target.checked })} className="w-4 h-4 text-red-600 bg-slate-700 border-slate-600 rounded focus:ring-red-500" />
-                            <label htmlFor="isDebt" className="text-sm font-bold text-red-400 flex items-center gap-1"><RefreshCw size={14} /> Veresiye / Borç Olarak Kaydet</label>
-                        </div>
-                        <button onClick={handleRecordPurchase} disabled={processing} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors mt-4 flex items-center justify-center gap-2">{processing ? <Loader2 className="animate-spin" size={18} /> : <Database size={18} />} Alımı Kaydet</button>
                     </div>
                 </div>
 
-                <div className="lg:col-span-2 space-y-6">
-                    {stockStats.lowStockCount > 0 && (
-                        <div className="bg-red-900/20 p-4 rounded-xl border border-red-500/30">
-                            <h4 className="font-bold text-red-400 flex items-center gap-2 mb-2"><AlertTriangle size={18} /> Düşük Stok Uyarısı ({stockStats.lowStockCount} ürün)</h4>
-                            <ul className="text-sm text-red-300 space-y-1">{lowStockIngredients.map(ing => (<li key={ing.id} className="flex justify-between border-b border-red-900/50 pb-1"><span>{ing.name}</span><span className="font-bold">{ing.stock} {ing.unit}</span></li>))}</ul>
+                {/* MAIN GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:h-[calc(100vh-220px)]">
+
+                    {/* LEFT COLUMN: SUPPLY CHAIN (INPUT) */}
+                    <div className="lg:col-span-5 flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar pr-2">
+
+                        {/* 1. Supplier & Purchase Card */}
+                        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -z-10 transition-opacity group-hover:opacity-100 opacity-50" />
+
+                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400"><Truck size={20} /></div>
+                                Tedarik & Yeni Alım
+                            </h3>
+
+                            <div className="space-y-5">
+                                {/* Ingredient Select */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Ne Alındı?</label>
+                                    <div className="relative">
+                                        <select
+                                            value={newPurchase.ingredientId}
+                                            onChange={(e) => setNewPurchase({ ...newPurchase, ingredientId: e.target.value })}
+                                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-white outline-none focus:border-indigo-500 font-medium transition-all"
+                                        >
+                                            <option value="">Ürün Seçiniz...</option>
+                                            {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name} ({ing.stock} {ing.unit})</option>)}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500"><ArrowRight size={16} /></div>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsCreatingIngredient(!isCreatingIngredient)}
+                                        className="text-xs font-bold text-indigo-400 mt-2 ml-1 hover:text-indigo-300 transition-colors flex items-center gap-1"
+                                    >
+                                        <PlusCircle size={14} /> Listede yok mu? Yeni Kart Aç
+                                    </button>
+                                </div>
+
+                                {/* New Ingredient Form (Collapsible) */}
+                                {isCreatingIngredient && (
+                                    <div className="bg-slate-800/50 p-4 rounded-xl border border-indigo-500/30 animate-in slide-in-from-top-4 space-y-3">
+                                        <input type="text" placeholder="Ürün Adı" value={newIngredient.name} onChange={(e) => setNewIngredient({ ...newIngredient, name: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white text-sm outline-none focus:border-indigo-500" />
+                                        <div className="flex gap-2">
+                                            <input type="number" placeholder="Fiyat" value={newIngredient.price} onChange={(e) => setNewIngredient({ ...newIngredient, price: e.target.value })} className="w-1/3 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white text-sm outline-none focus:border-indigo-500" />
+                                            <select value={newIngredient.unit} onChange={(e) => setNewIngredient({ ...newIngredient, unit: e.target.value })} className="w-1/3 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-300 text-sm outline-none focus:border-indigo-500"><option>kg</option><option>Liter</option><option>Adet</option><option>Gram</option></select>
+                                            <input type="number" placeholder="Stok" value={newIngredient.stock} onChange={(e) => setNewIngredient({ ...newIngredient, stock: e.target.value })} className="w-1/3 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white text-sm outline-none focus:border-indigo-500" />
+                                        </div>
+                                        <button onClick={handleAddIngredient} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg text-xs">OLUŞTUR</button>
+                                    </div>
+                                )}
+
+                                {/* Supplier Input with Datalist */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Kimden Alındı?</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Tedarikçi Ara veya Yaz..."
+                                        list="supplier-list"
+                                        value={newPurchase.supplier}
+                                        onChange={(e) => setNewPurchase({ ...newPurchase, supplier: e.target.value })}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-white outline-none focus:border-indigo-500 font-medium"
+                                    />
+                                    <datalist id="supplier-list">{stockStats.suppliers.map(s => <option key={s} value={s} />)}</datalist>
+                                </div>
+
+                                {/* Purchase Details */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Miktar</label>
+                                        <div className="relative">
+                                            <input type="number" placeholder="0" value={newPurchase.quantity} onChange={(e) => setNewPurchase({ ...newPurchase, quantity: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-white outline-none focus:border-indigo-500 font-bold font-mono text-lg" />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500 pointer-events-none">Birim</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Toplam Tutar</label>
+                                        <div className="relative">
+                                            <input type="number" placeholder="0.00" value={newPurchase.amount} onChange={(e) => setNewPurchase({ ...newPurchase, amount: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-white outline-none focus:border-indigo-500 font-bold font-mono text-lg" />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500 pointer-events-none">₺</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Debt Calculation & Switch */}
+                                <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-colors" onClick={() => setNewPurchase(prev => ({ ...prev, isDebt: !prev.isDebt }))}>
+                                    <div>
+                                        <div className="text-sm font-bold text-white flex items-center gap-2">
+                                            <RefreshCw size={16} className={newPurchase.isDebt ? 'text-red-400' : 'text-slate-500'} />
+                                            {newPurchase.isDebt ? 'Veresiye (Borç) İşlemi' : 'Nakit / Kasa İşlemi'}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                            {newPurchase.isDebt ? 'Bu işlem "Borçlar" sayfasına yansıyacak.' : 'Ödeme kasadan düşülecek.'}
+                                        </div>
+                                    </div>
+                                    <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${newPurchase.isDebt ? 'bg-red-500' : 'bg-slate-700'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${newPurchase.isDebt ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleRecordPurchase}
+                                    disabled={processing}
+                                    className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-900/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
+                                >
+                                    {processing ? <Loader2 className="animate-spin" /> : <Package size={20} />}
+                                    STOKLARA İŞLE
+                                </button>
+                            </div>
                         </div>
-                    )}
-                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                        <h3 className="font-bold text-white mb-4 flex items-center gap-2"><Box size={18} /> Hammadde Stok Durumu</h3>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left text-slate-400">
-                                <thead className="text-xs text-slate-500 uppercase bg-slate-900/50">
-                                    <tr><th className="px-4 py-3 rounded-l-lg">Hammadde</th><th className="px-4 py-3">Birim Fiyat</th><th className="px-4 py-3">Stok Miktar</th><th className="px-4 py-3 text-right">Toplam Değer</th><th className="px-4 py-3 text-right rounded-r-lg">İşlem</th></tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-700">
-                                    {ingredients.map(ing => (
-                                        <tr key={ing.id} className="hover:bg-slate-700/50 transition-colors group">
-                                            <td className="px-4 py-3 font-bold text-white w-40"><input type="text" value={ing.name} onChange={(e) => handleUpdateIngredient(ing.id, 'name', e.target.value)} className="bg-transparent border-b border-transparent focus:border-indigo-500 outline-none w-full" /></td>
-                                            <td className="px-4 py-3 text-orange-400 w-32"><div className="flex items-center gap-1"><input type="number" value={ing.price} onChange={(e) => handleUpdateIngredient(ing.id, 'price', e.target.value)} className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-orange-400 font-bold w-20 text-right outline-none focus:border-orange-500 text-xs" /><span className='text-xs text-slate-500'>₺ / {ing.unit}</span></div></td>
-                                            <td className={`px-4 py-3 font-mono w-32 ${ing.stock < 5 ? 'text-red-400 font-bold' : 'text-slate-300'}`}><div className="flex items-center gap-1"><input type="number" value={ing.stock} onChange={(e) => handleUpdateIngredient(ing.id, 'stock', e.target.value)} className={`bg-slate-900 border border-slate-600 rounded px-2 py-1 ${ing.stock < 5 ? 'text-red-400' : 'text-slate-300'} font-bold w-16 text-right outline-none focus:border-indigo-500 text-xs`} /><span className='text-xs text-slate-500'>{ing.unit}</span></div></td>
-                                            <td className="px-4 py-3 text-right font-bold text-emerald-400">{formatCurrency(ing.price * (ing.stock || 0))} ₺</td>
-                                            <td className="px-4 py-3 text-right w-16"><button onClick={() => setDeleteData(ing)} className="text-slate-500 hover:text-red-500 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity" title="Hammaddeyi Sil"><Trash2 size={16} /></button></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            {ingredients.length === 0 && <div className="text-center py-8 text-slate-500 italic">Hiç hammadde kaydı yok. Lütfen yukarıdaki formdan yeni bir hammadde ekleyin.</div>}
+
+                        {/* Recent Suppliers Quick View */}
+                        <div className="grid grid-cols-2 gap-4">
+                            {stockStats.suppliers.slice(0, 4).map(supplier => (
+                                <div key={supplier} onClick={() => setNewPurchase(prev => ({ ...prev, supplier }))} className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/50 hover:bg-slate-800 hover:border-indigo-500/30 cursor-pointer transition-all">
+                                    <div className="text-xs font-bold text-slate-500 mb-1">Tedarikçi</div>
+                                    <div className="font-bold text-white truncate">{supplier}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                    </div>
+
+
+                    {/* RIGHT COLUMN: WAREHOUSE (STATE) */}
+                    <div className="lg:col-span-7 flex flex-col bg-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-3xl overflow-hidden shadow-2xl h-[800px] lg:h-full">
+
+                        {/* Warehouse Header */}
+                        <div className="p-6 border-b border-slate-700/50 bg-slate-900/80 sticky top-0 z-10">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-white flex items-center gap-2 text-lg">
+                                    <Database className="text-emerald-400" size={20} />
+                                    Depo Envanteri
+                                </h3>
+                                <div className="text-xs font-bold bg-slate-800 px-3 py-1.5 rounded-lg text-slate-400">
+                                    {ingredients.length} Kalem Ürün
+                                </div>
+                            </div>
+
+                            <div className="relative group">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Envanterde ara..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full bg-slate-950/50 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Inventory List */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            {stockStats.lowStockCount > 0 && (
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4 flex items-center gap-3 animate-pulse">
+                                    <div className="bg-red-500/20 p-2 rounded-lg text-red-500"><AlertTriangle size={20} /></div>
+                                    <div>
+                                        <div className="font-bold text-red-400">Kritik Stok Uyarısı</div>
+                                        <div className="text-xs text-red-300/70">{stockStats.lowStockCount} ürün tükenmek üzere.</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {filteredIngredients.map(ing => (
+                                <div key={ing.id} className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 group hover:bg-slate-800/60 transition-all">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={ing.name}
+                                                    onChange={(e) => handleUpdateIngredient(ing.id, 'name', e.target.value)}
+                                                    className="bg-transparent font-bold text-white text-lg outline-none border-b border-transparent focus:border-indigo-500 w-full lg:w-auto"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <input
+                                                    type="number"
+                                                    value={ing.price}
+                                                    onChange={(e) => handleUpdateIngredient(ing.id, 'price', e.target.value)}
+                                                    className="bg-slate-950/50 text-xs font-mono text-orange-400 w-16 px-1 rounded border border-transparent focus:border-orange-500 outline-none"
+                                                />
+                                                <span className="text-xs text-slate-500">₺ / {ing.unit}</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-lg font-black text-emerald-400">{formatCurrency((ing.stock || 0) * ing.price)} ₺</div>
+                                            <button
+                                                onClick={() => setDeleteData(ing)}
+                                                className="text-slate-600 hover:text-red-400 transition-colors p-1"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Visual Stock Bar */}
+                                    <div className="relative h-8 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 cursor-text group/bar">
+                                        <div
+                                            className={`absolute top-0 left-0 h-full transition-all duration-1000 ${getStockColor(ing.stock || 0)} opacity-20`}
+                                            style={{ width: `${getStockWidth(ing.stock || 0)}%` }}
+                                        />
+                                        <div
+                                            className={`absolute bottom-0 left-0 h-0.5 transition-all duration-1000 ${getStockColor(ing.stock || 0)}`}
+                                            style={{ width: `${getStockWidth(ing.stock || 0)}%` }}
+                                        />
+
+                                        <div className="absolute inset-0 flex items-center justify-between px-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-slate-500 uppercase">Stok:</span>
+                                                <input
+                                                    type="number"
+                                                    value={ing.stock}
+                                                    onChange={(e) => handleUpdateIngredient(ing.id, 'stock', e.target.value)}
+                                                    className={`bg-transparent font-black text-sm outline-none w-20 ${ing.stock < 5 ? 'text-red-400' : 'text-white'}`}
+                                                />
+                                            </div>
+                                            <span className="text-xs font-bold text-slate-600">{ing.unit}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {filteredIngredients.length === 0 && (
+                                <div className="text-center py-20 text-slate-500">
+                                    <Package size={48} className="mx-auto mb-4 opacity-20" />
+                                    <p>Ürün bulunamadı.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>

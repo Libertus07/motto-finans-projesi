@@ -6,19 +6,15 @@ import PowerGrid from '../components/Dashboard/PowerGrid';
 import AssetManagement from '../components/Dashboard/AssetManagement';
 import LoyaltyAnalysis from '../components/Dashboard/LoyaltyAnalysis';
 import OccupancyIndicator from '../components/Dashboard/OccupancyIndicator';
+import LiveScanMonitor from '../components/Dashboard/LiveScanMonitor';
 import AssetDetailModal from '../components/Dashboard/AssetDetailModal';
 import { FinancialStats, Transaction, Table, LoyaltyCustomer, Ingredient, Product } from '../types';
 
-interface DashboardProps {
-    stats: FinancialStats;
-    transactions: Transaction[];
-    tables?: Table[];
-    customers?: LoyaltyCustomer[]; // Müşteriler LoyaltyCustomer tipinde olmalı
-    ingredients?: Ingredient[];
-    products?: Product[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-const Dashboard: React.FC<DashboardProps> = ({ stats, transactions, tables = [], customers = [], ingredients = [], products = [] }) => {
+const Dashboard: React.FC = () => {
+    const { stats, transactions, tables, customers, ingredients, products } = useOutletContext<DashboardContextType>();
     const [selectedAssetInfo, setSelectedAssetInfo] = useState<{ title: string } | null>(null);
 
     // Use the calculation hook
@@ -108,6 +104,8 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, transactions, tables = [],
                 occupiedTables={calculations.occupiedTables}
                 occupancyRate={calculations.occupancyRate}
             />
+
+            <LiveScanMonitor tables={tables} />
 
             <AssetDetailModal
                 selectedAssetInfo={selectedAssetInfo}

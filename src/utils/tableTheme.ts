@@ -98,27 +98,27 @@ export const getDetailedOccupancyConfig = (rate: number, isDark: boolean): Occup
     if (rate < 20) return {
         ...common, label: "SAKİN", fill: "#06b6d4", text: "text-cyan-400",
         badgeBg: "bg-cyan-500/10", badgeBorder: "border-cyan-500/20", glow: "from-cyan-500/20",
-        cardBg: isDark ? "bg-cyan-950/30" : "bg-cyan-50", cardBorder: isDark ? "border-cyan-500/20" : "border-cyan-200"
+        cardBg: isDark ? "bg-cyan-950/30" : "bg-cyan-100/50", cardBorder: isDark ? "border-cyan-500/20" : "border-cyan-300/50"
     };
     if (rate < 40) return {
         ...common, label: "HAFİF TEMPO", fill: "#10b981", text: "text-emerald-400",
         badgeBg: "bg-emerald-500/10", badgeBorder: "border-emerald-500/20", glow: "from-emerald-500/20",
-        cardBg: isDark ? "bg-emerald-950/30" : "bg-emerald-50", cardBorder: isDark ? "border-emerald-500/20" : "border-emerald-200"
+        cardBg: isDark ? "bg-emerald-950/30" : "bg-emerald-100/50", cardBorder: isDark ? "border-emerald-500/20" : "border-emerald-300/50"
     };
     if (rate < 60) return {
         ...common, label: "CANLI", fill: "#f59e0b", text: "text-amber-400",
         badgeBg: "bg-amber-500/10", badgeBorder: "border-amber-500/20", glow: "from-amber-500/20",
-        cardBg: isDark ? "bg-amber-950/30" : "bg-amber-50", cardBorder: isDark ? "border-amber-500/20" : "border-amber-200"
+        cardBg: isDark ? "bg-amber-950/30" : "bg-amber-100/50", cardBorder: isDark ? "border-amber-500/20" : "border-amber-300/50"
     };
     if (rate < 80) return {
         ...common, label: "YOĞUN", fill: "#f97316", text: "text-orange-400",
         badgeBg: "bg-orange-500/10", badgeBorder: "border-orange-500/20", glow: "from-orange-500/20",
-        cardBg: isDark ? "bg-orange-950/30" : "bg-orange-50", cardBorder: isDark ? "border-orange-500/20" : "border-orange-200"
+        cardBg: isDark ? "bg-orange-950/30" : "bg-orange-100/50", cardBorder: isDark ? "border-orange-500/20" : "border-orange-300/50"
     };
     return {
         ...common, label: "TAM KAPASİTE", fill: "#ef4444", text: "text-rose-500",
         badgeBg: "bg-rose-500/10", badgeBorder: "border-rose-500/20", glow: "from-rose-500/20", animate: "animate-pulse",
-        cardBg: isDark ? "bg-rose-950/30" : "bg-rose-50", cardBorder: isDark ? "border-rose-500/20" : "border-rose-200"
+        cardBg: isDark ? "bg-rose-950/30" : "bg-rose-100/50", cardBorder: isDark ? "border-rose-500/20" : "border-rose-300/50"
     };
 };
 
@@ -232,28 +232,28 @@ export const getTableTheme = (
             };
         case 'needs_cleaning':
             return {
-                card: `${base} ${opacityClass} animate-pulse ` + (isDark
-                    ? `bg-cyan-950/40 ring-cyan-500/30 border-dashed hover:ring-cyan-400/60`
-                    : `bg-cyan-500/90 ring-cyan-400 ring-2 border-dashed shadow-xl shadow-cyan-500/20`),
-                textColor: isDark ? "text-cyan-100" : "text-white",
-                amountColor: "text-white",
-                iconColor: isDark ? "text-cyan-400" : "text-white",
-                badge: isDark ? "bg-cyan-500/20 ring-1 ring-cyan-500/30 text-cyan-200" : "bg-white/20 ring-1 ring-white/30 text-white backdrop-blur-md",
-                glow: "from-cyan-400/20 via-cyan-400/5 to-transparent"
+                card: `${base} ${opacityClass} animate-pulse-subtle ` + (isDark
+                    ? `bg-cyan-950/40 ring-cyan-500/50 border-dashed hover:ring-cyan-400 shadow-[0_0_40px_-10px_rgba(6,182,212,0.4)]`
+                    : `bg-gradient-to-br from-teal-400 to-cyan-500 ring-teal-300 ring-2 border-dashed shadow-xl shadow-cyan-500/20`),
+                textColor: "text-white",
+                amountColor: "text-white/90",
+                iconColor: "text-white/40",
+                badge: "bg-white/20 ring-1 ring-white/30 text-white backdrop-blur-md",
+                glow: "from-cyan-400/30 via-cyan-400/10 to-transparent"
             };
         case 'empty':
         default:
             return {
                 card: `${base} ${opacityClass} ` + (isDark
                     ? `bg-slate-900/60 ring-white/5 hover:ring-emerald-500/40 hover:bg-slate-800 hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.3)] group`
-                    : `bg-white/80 ring-slate-200 hover:ring-emerald-400 hover:shadow-xl hover:shadow-emerald-500/10 group`),
-                textColor: isDark ? "text-slate-400 group-hover:text-emerald-200 transition-colors" : "text-slate-500 group-hover:text-emerald-600 transition-colors",
-                amountColor: isDark ? "text-white" : "text-slate-800",
-                iconColor: isDark ? "text-emerald-800/50 group-hover:text-emerald-400 transition-colors" : "text-slate-300 group-hover:text-emerald-500 transition-colors",
-                badge: isDark ? "bg-emerald-500/10 ring-1 ring-emerald-500/20 text-emerald-400" : "bg-slate-100 ring-1 ring-slate-200 text-slate-500",
-                glow: isDark ? "from-emerald-500/10 via-emerald-500/5 to-transparent" : "from-emerald-400/5 via-emerald-400/2 to-transparent",
-                ghostIcon: isDark ? "text-white/5" : "text-slate-100",
-                ghostText: isDark ? "text-emerald-500/30" : "text-slate-200"
+                    : `bg-slate-900 ring-slate-800 hover:shadow-xl hover:shadow-emerald-500/10 group`),
+                textColor: isDark ? "text-slate-400 group-hover:text-emerald-200 transition-colors" : "text-slate-400 group-hover:text-emerald-200 transition-colors",
+                amountColor: isDark ? "text-white" : "text-slate-200",
+                iconColor: isDark ? "text-emerald-800/50 group-hover:text-emerald-400 transition-colors" : "text-emerald-500/30 group-hover:text-emerald-400 transition-colors",
+                badge: isDark ? "bg-emerald-500/10 ring-1 ring-emerald-500/20 text-emerald-400" : "bg-white/5 ring-1 ring-white/10 text-emerald-400",
+                glow: isDark ? "from-emerald-500/10 via-emerald-500/5 to-transparent" : "from-emerald-500/10 via-emerald-500/5 to-transparent",
+                ghostIcon: isDark ? "text-white/5" : "text-white/5",
+                ghostText: isDark ? "text-emerald-500/30" : "text-emerald-500/30"
             };
     }
 };

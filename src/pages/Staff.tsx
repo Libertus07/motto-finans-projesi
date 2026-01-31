@@ -12,23 +12,22 @@ import InfoModal from '../components/InfoModal';
 import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 import { Staff as StaffType, Transaction, StaffFinanceItem } from '../types';
 
-interface StaffProps {
-    staff: StaffType[];
-    transactions: Transaction[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-interface NewStaffState {
-    name: string;
-    role: string;
-    salary: string | number;
-    startDate: string;
-    salaryDay: string | number;
-    pin: string;
-    advances: StaffFinanceItem[];
-    payments: StaffFinanceItem[];
-}
+const Staff: React.FC = () => {
+    const { staff, transactions } = useOutletContext<DashboardContextType>();
 
-const Staff: React.FC<StaffProps> = ({ staff, transactions }) => {
+    interface NewStaffState {
+        name: string;
+        role: string;
+        salary: string | number;
+        startDate: string;
+        salaryDay: string | number;
+        pin: string;
+        advances: StaffFinanceItem[];
+        payments: StaffFinanceItem[];
+    }
     const [isFormOpen, setIsFormOpen] = useState(false);
 
     const [advanceModal, setAdvanceModal] = useState<{ open: boolean; staffId: string | null; staffName: string }>({ open: false, staffId: null, staffName: '' });

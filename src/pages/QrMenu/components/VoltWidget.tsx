@@ -66,89 +66,81 @@ const VoltWidget: React.FC<VoltWidgetProps> = ({ customerProfile, isMember, onOp
 
     return (
         <>
-            <div className="px-4 mt-4">
-                <div
-                    className="relative rounded-[2rem] overflow-hidden transition-all duration-300 group shadow-[0_10px_30px_rgba(67,40,24,0.15)] cursor-pointer hover:scale-[1.01]"
-                    onClick={() => isMember ? handleShowHistory() : onOpenAuth()}
-                >
-                    {/* Background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#432818] to-[#2c1a0f]">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-[#D4AF37]/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#D4AF37]/5 rounded-full blur-2xl -ml-10 -mb-10"></div>
-                        {/* Pattern */}
-                        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(#D4AF37 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="relative z-10 p-6">
-                        {/* Header */}
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
-                                        <Crown size={14} className="text-[#D4AF37]" />
-                                    </div>
-                                    <h3 className="font-black text-lg text-[#FDFBF7] font-cinzel tracking-wider">
-                                        {isMember ? currentTier.name.toUpperCase() : 'MOTTO CLUB'}
-                                    </h3>
-                                </div>
-                                <p className="text-[#D4AF37]/60 text-xs font-medium pl-1">
-                                    {isMember
-                                        ? "Ayrıcalıkların tadını çıkarın"
-                                        : "Puan topla, hediyeler kazan"}
-                                </p>
-                            </div>
-                            {isMember && (
-                                <div className="text-right">
-                                    <div className="flex items-center justify-end gap-1 text-[#D4AF37]">
-                                        <Zap size={18} fill="currentColor" />
-                                        <span className="text-3xl font-black font-cinzel leading-none">{volts}</span>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Volt Puan</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="relative pt-2">
-                            <div className="flex justify-between text-[10px] font-bold text-[#D4AF37]/60 mb-2 font-cinzel">
-                                <span>{currentTier.name}</span>
-                                {nextTier && <span>{nextTier.name} ({nextTier.min}V)</span>}
-                            </div>
-
-                            <div className="h-4 bg-black/20 rounded-full overflow-hidden p-0.5 border border-white/5 backdrop-blur-sm">
-                                <div
-                                    className="h-full bg-gradient-to-r from-[#D4AF37] to-[#FDFBF7] rounded-full shadow-[0_0_15px_rgba(212,175,55,0.4)] relative transition-all duration-1000 ease-out"
-                                    style={{ width: `${isMember ? progress : 0}%` }}
-                                >
-                                    <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
-                                </div>
-                            </div>
-
-                            {isMember && nextTier && (
-                                <p className="text-right text-[9px] text-white/30 mt-2 font-medium">
-                                    Sonraki seviyeye <span className="text-[#D4AF37]">{nextTier.min - volts} Volt</span> kaldı
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Guest Overlay */}
-                    {!isMember && (
-                        <div className="absolute inset-0 z-20 bg-[#1a110d]/60 backdrop-blur-[3px] flex flex-col items-center justify-center text-center p-6 animate-in fade-in">
-                            <div className="w-12 h-12 bg-[#D4AF37] rounded-2xl rotate-3 flex items-center justify-center shadow-lg mb-3 border border-[#FDFBF7]/20">
-                                <Lock size={24} className="text-[#1a110d]" />
-                            </div>
-                            <h4 className="text-white font-bold font-cinzel text-lg mb-1">Motto Club'a Katıl</h4>
-                            <p className="text-white/80 text-xs mb-5 max-w-[200px] leading-relaxed">
-                                İlk siparişinde 50 Volt hediye kazan ve ayrıcalıklı dünyaya adım at!
-                            </p>
-                            <button className="bg-[#D4AF37] text-[#1a110d] px-8 py-3 rounded-xl font-bold font-cinzel text-sm hover:bg-white transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] active:scale-95 flex items-center gap-2">
-                                HEMEN ÜYE OL <ChevronRight size={16} />
-                            </button>
-                        </div>
-                    )}
+            <div
+                className="relative rounded-[2rem] overflow-hidden transition-all duration-300 group shadow-[0_10px_30px_rgba(67,40,24,0.15)] cursor-pointer hover:scale-[1.01] h-full"
+                onClick={() => isMember ? handleShowHistory() : onOpenAuth()}
+            >
+                {/* Background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#432818] to-[#2c1a0f]">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-[#D4AF37]/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                    <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#D4AF37]/5 rounded-full blur-2xl -ml-10 -mb-10"></div>
+                    {/* Pattern */}
+                    <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(#D4AF37 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
                 </div>
+
+                {/* Content */}
+                <div className="relative z-10 p-5 flex flex-col h-full justify-between">
+                    {/* Header */}
+                    <div className="flex flex-col gap-3 mb-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
+                                <Crown size={12} className="text-[#D4AF37]" />
+                            </div>
+                            <h3 className="font-black text-sm text-[#FDFBF7] font-cinzel tracking-wider truncate">
+                                {isMember ? currentTier.name.toUpperCase() : 'MOTTO CLUB'}
+                            </h3>
+                        </div>
+
+                        {isMember && (
+                            <div>
+                                <div className="flex items-center gap-1 text-[#D4AF37]">
+                                    <Zap size={16} fill="currentColor" />
+                                    <span className="text-2xl font-black font-cinzel leading-none">{volts}</span>
+                                </div>
+                                <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest block">Volt Puan</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="relative pt-2">
+                        <div className="flex justify-between text-[10px] font-bold text-[#D4AF37]/60 mb-2 font-cinzel">
+                            <span>{currentTier.name}</span>
+                            {nextTier && <span>{nextTier.name} ({nextTier.min}V)</span>}
+                        </div>
+
+                        <div className="h-4 bg-black/20 rounded-full overflow-hidden p-0.5 border border-white/5 backdrop-blur-sm">
+                            <div
+                                className="h-full bg-gradient-to-r from-[#D4AF37] to-[#FDFBF7] rounded-full shadow-[0_0_15px_rgba(212,175,55,0.4)] relative transition-all duration-1000 ease-out"
+                                style={{ width: `${isMember ? progress : 0}%` }}
+                            >
+                                <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
+                            </div>
+                        </div>
+
+                        {isMember && nextTier && (
+                            <p className="text-right text-[9px] text-white/30 mt-2 font-medium">
+                                Sonraki seviyeye <span className="text-[#D4AF37]">{nextTier.min - volts} Volt</span> kaldı
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                {/* Guest Overlay */}
+                {!isMember && (
+                    <div className="absolute inset-0 z-20 bg-[#1a110d]/60 backdrop-blur-[3px] flex flex-col items-center justify-center text-center p-4 animate-in fade-in">
+                        <div className="w-10 h-10 bg-[#D4AF37] rounded-xl rotate-3 flex items-center justify-center shadow-lg mb-2 border border-[#FDFBF7]/20">
+                            <Lock size={20} className="text-[#1a110d]" />
+                        </div>
+                        <h4 className="text-white font-bold font-cinzel text-sm mb-1 uppercase tracking-tighter">Motto Club</h4>
+                        <p className="text-white/80 text-[10px] mb-4 leading-tight">
+                            Üye ol, hediyeler kazan!
+                        </p>
+                        <button className="bg-[#D4AF37] text-[#1a110d] px-4 py-2 rounded-lg font-bold font-cinzel text-[10px] hover:bg-white transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] active:scale-95 flex items-center gap-1 uppercase">
+                            KATIL <ChevronRight size={12} />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <VoltHistoryModal

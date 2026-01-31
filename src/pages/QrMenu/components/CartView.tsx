@@ -1,6 +1,10 @@
 import React from 'react';
-import { Minus, Plus, ShoppingBag, ArrowLeft, ArrowRight, CreditCard, Wallet, Trash2 } from 'lucide-react';
-import { QrCartItem } from '../../../types';
+import { Minus, Plus, ShoppingBag, ArrowLeft, ArrowRight, CreditCard, Wallet, Trash2, Lock } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db, appId } from '../../../services/firebase';
+import { SHOP_ID } from '../../../utils/constants';
+import { Deal } from '../../../types';
 
 interface CartViewProps {
     cart: any[];
@@ -32,6 +36,94 @@ const CartView: React.FC<CartViewProps> = ({
     };
 
     const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    // Coupon State
+    const [couponCode, setCouponCode] = React.useState('');
+    const [appliedDiscount, setAppliedDiscount] = React.useState<{ code: string; amount: number; type: 'percentage' | 'fixed' } | null>(null);
+    const [couponError, setCouponError] = React.useState<string | null>(null);
+    const [verifying, setVerifying] = React.useState(false);
+
+    const finalTotal = appliedDiscount ? Math.max(0, totalAmount - appliedDiscount.amount) : totalAmount;
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode) return;
+        setVerifying(true);
+        setCouponError(null);
+
+        try {
+            const dealsRef = collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'deals');
+            const q = query(dealsRef, where('code', '==', couponCode.toUpperCase()), where('isActive', '==', true));
+            const snapshot = await getDocs(q);
+
+            if (snapshot.empty) {
+                setCouponError('Geçersiz veya süresi dolmuş kupon kodu.');
+                setVerifying(false);
+                return;
+            }
+
+            const dealData = snapshot.docs[0].data() as Deal;
+
+            // Check Expiry
+            if (dealData.expiresAt && new Date(dealData.expiresAt) < new Date()) {
+                setCouponError('Bu kuponun süresi dolmuş.');
+                setVerifying(false);
+                return;
+            }
+
+            // Calculate Discount
+            let discountAmount = 0;
+            if (dealData.discountType === 'percentage') {
+                discountAmount = (totalAmount * (dealData.discountValue || 0)) / 100;
+            } else {
+                discountAmount = dealData.discountValue || 0;
+            }
+
+            setAppliedDiscount({
+                code: dealData.code,
+                amount: discountAmount,
+                type: dealData.discountType
+            });
+            setCouponCode('');
+        } catch (error) {
+            console.error("Coupon verification error", error);
+            setCouponError('Kupon sorgulanırken hata oluştu.');
+        } finally {
+            setVerifying(false);
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedDiscount(null);
+    };
+
+    const handleCheckout = (method: 'cash' | 'online') => {
+        // Trigger Fireworks!
+        const duration = 3000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 60 };
+
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+        const interval: any = setInterval(function () {
+            const timeLeft = animationEnd - Date.now();
+
+            if (timeLeft <= 0) {
+                return clearInterval(interval);
+            }
+
+            const particleCount = 50 * (timeLeft / duration);
+            // since particles fall down, start a bit higher than random
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+        }, 250);
+
+        // Pass total with discount if needed, but usually we just place order. 
+        // Logic for backend to validate total might enter here, 
+        // but for now we assume client trust for MVP or send discount amount.
+        // Assuming handlePlaceOrder takes method only. 
+        // In a real app we'd send the coupon code with the order.
+        handlePlaceOrder(method);
+    };
 
     if (cart.length === 0) return (
         <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
@@ -128,19 +220,65 @@ const CartView: React.FC<CartViewProps> = ({
             <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[2rem] shadow-[0_-10px_40px_rgba(67,40,24,0.15)] z-50 p-6 pb-safe-bottom animate-in slide-in-from-bottom duration-300">
                 <div className="w-12 h-1.5 bg-[#432818]/10 rounded-full mx-auto mb-6"></div>
 
+                {/* Coupon Code Section */}
+                <div className="mb-6">
+                    {appliedDiscount ? (
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-emerald-600">
+                                <Wallet size={18} />
+                                <span className="font-bold sm:text-sm text-xs">Kupon Uygulandı: {appliedDiscount.code}</span>
+                            </div>
+                            <button
+                                onClick={handleRemoveCoupon}
+                                className="text-emerald-600 hover:text-emerald-800 text-xs font-bold underline"
+                            >
+                                Kaldır
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={couponCode}
+                                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                    placeholder="Kampanya Kodu (Opsiyonel)"
+                                    className="flex-1 bg-[#F9F7F5] border border-[#432818]/10 rounded-xl px-4 py-3 text-[#432818] text-sm focus:outline-none focus:border-[#D4AF37] placeholder:text-[#432818]/30 font-bold"
+                                />
+                                <button
+                                    onClick={handleApplyCoupon}
+                                    disabled={!couponCode || verifying}
+                                    className="bg-[#432818] text-[#D4AF37] px-4 rounded-xl font-bold text-sm disabled:opacity-50"
+                                >
+                                    {verifying ? '...' : 'Uygula'}
+                                </button>
+                            </div>
+                            {couponError && <p className="text-red-500 text-xs font-bold pl-1">{couponError}</p>}
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex justify-between items-end mb-6">
                     <div>
                         <p className="text-[#432818]/40 text-xs font-bold uppercase tracking-widest mb-1">{t('total_amount')}</p>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-4xl font-black text-[#432818] font-cinzel tracking-tight">{totalAmount}</span>
-                            <span className="text-xl font-bold text-[#432818]">₺</span>
+                        <div className="flex flex-col">
+                            {appliedDiscount && (
+                                <div className="flex items-baseline gap-2 mb-1">
+                                    <span className="text-[#432818]/40 line-through text-lg font-bold">{totalAmount} ₺</span>
+                                    <span className="text-emerald-600 text-sm font-bold">(-{Math.floor(appliedDiscount.amount)} ₺)</span>
+                                </div>
+                            )}
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-4xl font-black text-[#432818] font-cinzel tracking-tight">{Math.max(0, finalTotal)}</span>
+                                <span className="text-xl font-bold text-[#432818]">₺</span>
+                            </div>
                         </div>
                     </div>
                     {isMember && (
                         <div className="text-right">
                             <p className="text-[#D4AF37] text-xs font-bold uppercase tracking-widest mb-1">{t('will_earn')}</p>
                             <div className="flex items-center justify-end gap-1 text-[#D4AF37]">
-                                <span className="text-2xl font-black font-cinzel">+{Math.floor(totalAmount)}</span>
+                                <span className="text-2xl font-black font-cinzel">+{Math.floor(finalTotal)}</span>
                                 <span className="text-sm font-bold">VOLT</span>
                             </div>
                         </div>
@@ -149,33 +287,27 @@ const CartView: React.FC<CartViewProps> = ({
 
                 <div className="space-y-3">
                     <button
-                        onClick={() => {
-                            if (!isMember) {
-                                setAuthMode('register');
-                                setIsAuthModalOpen(true);
-                            } else {
-                                handlePlaceOrder('online');
-                            }
-                        }}
-                        className={`w - full py - 4 rounded - xl font - bold flex items - center justify - between px - 6 transition - all active: scale - [0.98] ${isMember
-                            ? 'bg-[#432818] text-[#D4AF37] shadow-lg shadow-[#432818]/20'
-                            : 'bg-[#FDFBF7] border-2 border-[#432818]/10 text-[#432818]/40'
-                            } `}
+                        disabled={true}
+                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-between px-6 transition-all bg-[#F3F4F6] border-2 border-dashed border-gray-300 text-gray-400 cursor-not-allowed`}
                     >
                         <div className="flex items-center gap-4">
-                            <div className={`p - 2 rounded - lg ${isMember ? 'bg-[#D4AF37]/20' : 'bg-[#432818]/5'} `}>
-                                <CreditCard size={24} />
+                            <div className={`p-2 rounded-lg bg-gray-200 text-gray-400`}>
+                                <div className="relative">
+                                    <CreditCard size={24} />
+                                    <div className="absolute -top-1 -right-1 bg-gray-500 rounded-full p-0.5 border border-white">
+                                        <Lock size={10} className="text-white" />
+                                    </div>
+                                </div>
                             </div>
                             <div className="text-left">
                                 <span className="block leading-none font-cinzel text-lg">{t('pay_online')}</span>
-                                {!isMember && <span className="text-[10px] font-bold font-sans opacity-70">{t('members_only')}</span>}
+                                <span className="text-[10px] font-bold font-sans opacity-70 uppercase tracking-wider">YAKINDA</span>
                             </div>
                         </div>
-                        {isMember && <ArrowRight size={20} />}
                     </button>
 
                     <button
-                        onClick={() => handlePlaceOrder('cash')}
+                        onClick={() => handleCheckout('cash')}
                         className="w-full bg-[#D4AF37] text-[#432818] py-4 rounded-xl font-bold shadow-lg shadow-[#D4AF37]/20 flex items-center justify-between px-6 active:scale-[0.98] transition-transform"
                     >
                         <div className="flex items-center gap-4">

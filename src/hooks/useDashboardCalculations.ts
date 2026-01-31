@@ -127,7 +127,7 @@ export default function useDashboardCalculations(
         // 1. Tüm işlemlerdeki ürünleri tara
         transactions.forEach(t => {
             if (t.type === 'income' && t.items) {
-                t.items.forEach((item: any) => {
+                t.items.forEach((item) => {
                     const pointsEarned = Math.floor((item.price * item.quantity) * 2); // 1 TL = 2 puan
                     productStats[item.name] = (productStats[item.name] || 0) + pointsEarned;
                 });

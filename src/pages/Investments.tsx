@@ -19,12 +19,8 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 import { Investment } from '../types';
 
-interface InvestmentsProps {
-    investments: Investment[];
-    marketRates: Record<string, number>;
-}
-
-// --- İÇ BİLEŞENLER ---
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
 interface StatCardProps {
     title: string;
@@ -94,7 +90,8 @@ const AssetCard: React.FC<AssetCardProps> = ({ type, quantity, avgCost, currentV
     </div>
 );
 
-const Investments: React.FC<InvestmentsProps> = ({ investments, marketRates }) => {
+const Investments: React.FC = () => {
+    const { investments, marketRates } = useOutletContext<DashboardContextType>();
     const getInitialPrice = (type: string) => marketRates?.[type] || '';
 
     const [newInvestment, setNewInvestment] = useState({
@@ -223,7 +220,15 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, marketRates }) =
     return (
         <div className="max-w-7xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500 pb-20">
             <ConfirmationModal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDeleteConfirm} title="Yatırımı Sil" message="Bu yatırımı portföyden silmek istediğinize emin misiniz? Bu işlem geri alınamaz." loading={loading} />
-            <LiquidationModal isOpen={!!liquidationData} onClose={() => setLiquidationData(null)} investment={liquidationData as any} onConfirm={handleLiquidateConfirm} loading={loading} />
+            {liquidationData && (
+                <LiquidationModal
+                    isOpen={!!liquidationData}
+                    onClose={() => setLiquidationData(null)}
+                    investment={liquidationData}
+                    onConfirm={handleLiquidateConfirm}
+                    loading={loading}
+                />
+            )}
 
             {/* ÜST BİLGİ KARTLARI */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -337,7 +342,7 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, marketRates }) =
                                     {Object.keys(INITIAL_MARKET_RATES).slice(0, 3).map(type => (
                                         <button
                                             key={type}
-                                            onClick={() => setNewInvestment({ ...newInvestment, type, currentPrice: (marketRates[type] || '') as any })}
+                                            onClick={() => setNewInvestment({ ...newInvestment, type, currentPrice: (marketRates[type] || '') })}
                                             className={`text-xs p-2 rounded-lg border transition-all ${newInvestment.type === type ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'}`}
                                         >
                                             {type}
@@ -346,7 +351,7 @@ const Investments: React.FC<InvestmentsProps> = ({ investments, marketRates }) =
                                 </div>
                                 <select
                                     value={newInvestment.type}
-                                    onChange={(e) => setNewInvestment({ ...newInvestment, type: e.target.value, currentPrice: (marketRates[e.target.value] || '') as any })}
+                                    onChange={(e) => setNewInvestment({ ...newInvestment, type: e.target.value, currentPrice: (marketRates[e.target.value] || '') })}
                                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-all mt-2 text-sm"
                                 >
                                     {Object.keys(INITIAL_MARKET_RATES).map(rate => <option key={rate} value={rate}>{rate}</option>)}

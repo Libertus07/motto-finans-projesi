@@ -22,7 +22,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ view, setView, cartCount, onOpenS
 
                 {/* CART - Central Button */}
                 <button onClick={() => setView('cart')} className="relative -top-8 group">
-                    <div className="w-16 h-16 bg-[#432818] rounded-[2rem] rotate-45 flex items-center justify-center shadow-xl border-[4px] border-[#FDFBF7] group-active:scale-95 transition-transform overflow-hidden">
+                    <div id="cart-nav-button" className="w-16 h-16 bg-[#432818] rounded-[2rem] rotate-45 flex items-center justify-center shadow-xl border-[4px] border-[#FDFBF7] group-active:scale-95 transition-transform overflow-hidden">
                         <div className="-rotate-45 flex flex-col items-center relative">
                             <ShoppingBag size={24} color="#D4AF37" />
                             {cartCount > 0 && (
@@ -35,7 +35,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ view, setView, cartCount, onOpenS
                     <span className="text-[10px] font-black text-[#432818] absolute -bottom-6 left-1/2 -translate-x-1/2 mt-1 font-cinzel tracking-tighter">{t('cart')}</span>
                 </button>
 
-                <button onClick={onOpenService} className="flex flex-col items-center justify-center w-14 h-14 mb-2 transition-colors text-[#432818]/40 hover:text-[#432818]"><Bell size={24} strokeWidth={2} /><span className="text-[9px] font-medium mt-1 font-cinzel">{t('messenger')}</span></button>
+                <button onClick={onOpenService} className="flex flex-col items-center justify-center w-14 h-14 mb-2 transition-colors text-[#432818]/40 hover:text-[#432818]"><Bell size={24} strokeWidth={2} /><span className="text-[9px] font-medium mt-1 font-cinzel">Garson</span></button>
 
                 {/* PROFILE / AUTH - Moved here */}
                 <button

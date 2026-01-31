@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LogOut, Zap, ScrollText, CreditCard, Heart, Gift, Trash2, AlertTriangle, Pencil, X, User, Calendar, Save, Loader2, Camera, History, ArrowUpRight, ArrowDownLeft, Plus, Package, Ticket, Timer, Copy, Bell, Settings, Moon, Sun, Check, ChevronRight, Share2, HelpCircle, MessageCircle, Phone, LayoutDashboard, Edit3, Disc, BarChart3, Info } from 'lucide-react';
+import { LogOut, Zap, ScrollText, CreditCard, Heart, Gift, Trash2, AlertTriangle, Pencil, X, User, Calendar, Save, Loader2, Camera, History, ArrowUpRight, ArrowDownLeft, Plus, Package, Ticket, Timer, Copy, Bell, Settings, Moon, Sun, Check, ChevronRight, Share2, HelpCircle, MessageCircle, Phone, LayoutDashboard, Edit3, Disc, BarChart3, Info, Target, Medal } from 'lucide-react';
 import { deleteUser } from 'firebase/auth';
-import { doc, deleteDoc, updateDoc, collection, query, where, orderBy, limit, getDocs, addDoc, onSnapshot, getDoc, arrayRemove, setDoc } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc, collection, query, where, orderBy, limit, getDocs, addDoc, onSnapshot, getDoc, arrayRemove, setDoc, arrayUnion } from 'firebase/firestore';
 import { auth, db, appId } from '../../../services/firebase';
 import { SHOP_ID } from '../../../utils/constants';
-import { CustomerProfile, Deal, Notification, Card, PointHistoryItem, Product as GlobalProduct } from '../../../types';
+import { CustomerProfile, Deal, Notification, Card, PointHistoryItem, Product as GlobalProduct, Order } from '../../../types';
 import { useToast } from '../components/ToastProvider';
 import PointHistoryModal from './PointHistoryModal';
 import CardsModal from './CardsModal';
@@ -20,6 +20,13 @@ import AdminBonusModal from './AdminBonusModal';
 import InviteFriendModal from './InviteFriendModal';
 import HelpModal from './HelpModal';
 import EditProfileModal from './EditProfileModal';
+import { getTier, getNextTier, getTierThreshold, getTierColor, getTierBadge } from '../../../utils/loyalty';
+import MissionsModal from './MissionsModal';
+import MissionsSettingsModal from './MissionsSettingsModal';
+import { Challenge } from '../../../types';
+import { calculateProgress, checkBadges } from '../../../utils/gamification';
+import BadgesModal from './BadgesModal';
+import TierBenefitsModal from './TierBenefitsModal';
 
 interface AccountViewProps {
     customerProfile: CustomerProfile | null;
@@ -70,7 +77,7 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
     const [favoriteProducts, setFavoriteProducts] = useState<GlobalProduct[]>([]);
     const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
     const [showOrdersModal, setShowOrdersModal] = useState(false);
-    const [orders, setOrders] = useState<any[]>([]); // Orders are complex, keeping any or will define Order later
+    const [orders, setOrders] = useState<Order[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(false);
     const [showDealsModal, setShowDealsModal] = useState(false);
     const [deals, setDeals] = useState<Deal[]>([]);
@@ -81,6 +88,8 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
+    const [showBadgesModal, setShowBadgesModal] = useState(false);
+    const [showTierModal, setShowTierModal] = useState(false);
     const [showAdminBonusModal, setShowAdminBonusModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -100,6 +109,102 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
     const [newRefereeReward, setNewRefereeReward] = useState((refereeReward || 0).toString());
 
     // Eski kullanıcılar için davet kodu oluşturma (Backfill)
+
+    // --- MISSIONS LOGIC ---
+    const [showMissionsModal, setShowMissionsModal] = useState(false);
+    const [showMissionsSettingsModal, setShowMissionsSettingsModal] = useState(false);
+    const [challenges, setChallenges] = useState<Challenge[]>([]);
+
+    useEffect(() => {
+        const challengesRef = collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'challenges');
+        const q = query(challengesRef, orderBy('createdAt', 'desc'));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedChallenges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Challenge));
+
+            // Merge with local progress / Checks
+            const merged = fetchedChallenges.map(c => {
+                let status: 'active' | 'completed' | 'claimed' = 'active';
+
+                // Calculate automated progress
+                const { progress, isCompleted } = calculateProgress(c, customerProfile);
+
+                // Check claim status
+                if (customerProfile?.['claimedChallenges']?.includes(c.id)) {
+                    status = 'claimed';
+                } else if (isCompleted) {
+                    status = 'completed';
+                }
+
+                return { ...c, progress, status };
+            });
+
+            setChallenges(merged);
+        });
+
+        return () => unsubscribe();
+    }, [customerProfile]);
+
+    // Check Badges on Load
+    useEffect(() => {
+        if (!customerProfile || !customerProfile.uid) return;
+
+        const newBadges = checkBadges(customerProfile);
+        if (newBadges.length > 0) {
+            const badgeIds = newBadges.map(b => b.id);
+
+            // Update Firestore
+            const userRef = doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'customers', auth.currentUser?.uid || 'unknown');
+
+            // Optimistic update (optional, but good practice if we had local state for badges)
+            // For now just DB update
+            updateDoc(userRef, {
+                badges: arrayUnion(...badgeIds)
+            }).then(() => {
+                showToast(`Tebrikler! ${newBadges.length} yeni rozet kazandınız! 🏅`, 'success');
+            }).catch(err => console.error("Badge update error", err));
+        }
+    }, [customerProfile, showToast]);
+
+
+
+
+    const handleClaimChallenge = async (challengeId: string) => {
+        if (!auth.currentUser) return;
+
+        const challenge = challenges.find(c => c.id === challengeId);
+        if (!challenge || challenge.status !== 'active' || challenge.progress < challenge.target) return;
+
+        try {
+            // Update local state first for optimistic UI
+            setChallenges(prev => prev.map(c =>
+                c.id === challengeId ? { ...c, status: 'claimed' } : c
+            ));
+
+            // Add points to user
+            const userRef = doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'customers', auth.currentUser.uid);
+            await updateDoc(userRef, {
+                points: (customerProfile?.points || 0) + challenge.reward,
+                claimedChallenges: arrayUnion(challengeId)
+            });
+
+            // Log transaction
+            await addDoc(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'transactions'), {
+                customerId: auth.currentUser.uid,
+                customerPhone: customerProfile?.phone,
+                type: 'game',
+                points: challenge.reward,
+                desc: `Görev Tamamlandı: ${challenge.title} 🎯`,
+                timestamp: new Date()
+            });
+
+            showToast(`${challenge.reward} Volt kazandınız!`, 'success');
+        } catch (error) {
+            console.error("Claim error:", error);
+            showToast('Ödül alınırken hata oluştu.', 'error');
+        }
+    };
+
     useEffect(() => {
         if (customerProfile && !customerProfile.personalInviteCode && auth.currentUser) {
             const generateAndSaveCode = async () => {
@@ -207,9 +312,9 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                 await deleteUser(user);
                 showToast('Hesabınız başarıyla silindi.', 'success');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            if (error.code === 'auth/requires-recent-login') {
+            if ((error as { code?: string }).code === 'auth/requires-recent-login') {
                 showToast('Güvenlik gereği hesabınızı silmek için yeniden giriş yapmalısınız.', 'error');
                 onSignOut();
             } else {
@@ -341,13 +446,13 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
         setShowOrdersModal(true);
         try {
             const ordersRef = collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'orders');
-            let allOrders: any[] = [];
+            let allOrders: Order[] = [];
 
             // 1. Query by User ID (Primary)
             try {
                 const q1 = query(ordersRef, where('customerId', '==', auth.currentUser.uid), orderBy('createdAt', 'desc'), limit(20));
                 const snapshot1 = await getDocs(q1);
-                allOrders = snapshot1.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allOrders = snapshot1.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Order));
             } catch (err) {
                 console.error("Error fetching by customerId:", err);
                 throw err; // Stop if primary query fails
@@ -358,7 +463,7 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                 try {
                     const q2 = query(ordersRef, where('customerPhone', '==', customerProfile.phone), orderBy('createdAt', 'desc'), limit(20));
                     const snapshot2 = await getDocs(q2);
-                    const phoneOrders = snapshot2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const phoneOrders = snapshot2.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Order));
                     allOrders = [...allOrders, ...phoneOrders];
                 } catch (err) {
                     // Likely missing index or permission issue. Log but don't block UI.
@@ -370,9 +475,17 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
             const uniqueOrders = Array.from(new Map(allOrders.map(item => [item.id, item])).values());
 
             // Sort locally (since we merged two sorted lists, fine tuning)
-            uniqueOrders.sort((a, b) =>
-                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
+            uniqueOrders.sort((a, b) => {
+                const getDate = (item: Order) => {
+                    if (!item.createdAt) return 0;
+                    if (item.createdAt instanceof Date) return item.createdAt.getTime();
+                    if (typeof item.createdAt === 'string') return new Date(item.createdAt).getTime();
+                    // Firestore Timestamp
+                    if ('seconds' in item.createdAt) return (item.createdAt as { seconds: number }).seconds * 1000;
+                    return 0;
+                };
+                return getDate(b) - getDate(a);
+            });
 
             setOrders(uniqueOrders);
         } catch (error) {
@@ -402,7 +515,9 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                         description: 'İlk siparişinde geçerli %10 indirim seni bekliyor!',
                         code: 'WELCOME10',
                         expiresAt: new Date(Date.now() + 86400000 * 7).toISOString(),
-                        image: '🎁'
+                        image: '🎁',
+                        discountValue: 10,
+                        discountType: 'percentage'
                     },
                     {
                         id: 'coffee_lover',
@@ -410,7 +525,9 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                         description: '3. Nesil kahvelerde 2 al 1 öde fırsatı.',
                         code: 'COFFEE2X1',
                         expiresAt: new Date(Date.now() + 86400000 * 2).toISOString(),
-                        image: '☕'
+                        image: '☕',
+                        discountValue: 0,
+                        discountType: 'fixed' // 2al1öde mantığı farklı olabilir ama type hatasını çözmek için 'fixed' veya 'percentage' gerekli
                     }
                 ];
             }
@@ -502,58 +619,194 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
         }
     };
 
+    const currentPoints = customerProfile?.points || 0;
+    const currentTier = getTier(currentPoints);
+    const nextTier = getNextTier(currentTier);
+    const nextThreshold = nextTier ? getTierThreshold(nextTier) : 0;
+    const prevThreshold = getTierThreshold(currentTier);
+
+    // Progress calculation
+    // Avoid division by zero and cap at 100%
+    let progress = 0;
+    if (nextTier) {
+        const totalGap = nextThreshold - prevThreshold;
+        const currentProgress = currentPoints - prevThreshold;
+        progress = Math.min(Math.max((currentProgress / totalGap) * 100, 0), 100);
+    } else {
+        progress = 100; // Max tier reached
+    }
+
     return (
+
         <div className="min-h-screen bg-[#FDFBF7] pb-32">
             {/* Header Background - Standard Motto Style */}
-            <div className="bg-[#432818] pt-12 pb-24 rounded-b-[3rem] relative overflow-hidden shadow-xl">
+            <div className="bg-[#432818] pt-12 pb-32 rounded-b-[3rem] relative overflow-hidden shadow-xl">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                 <div className="absolute bottom-0 left-0 w-full h-20 bg-gradient-to-t from-black/20 to-transparent"></div>
             </div>
 
-            <div className="px-5 -mt-20 relative z-10 max-w-lg mx-auto">
+            <div className="px-5 -mt-24 relative z-10 max-w-lg mx-auto">
                 {/* Profil Kartı - Clean Light Style */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-[0_20px_40px_rgba(67,40,24,0.08)] mb-8 text-center relative border border-[#432818]/5">
+                <div className="bg-white rounded-[2.5rem] p-6 shadow-[0_20px_40px_rgba(67,40,24,0.08)] mb-8 text-center relative border border-[#432818]/5 overflow-hidden">
+                    {/* Decorative Shine */}
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-[#D4AF37]/20 to-transparent rounded-full blur-2xl"></div>
 
                     <div className="relative inline-block mb-4">
-                        <div className="w-28 h-28 rounded-full border-4 border-white shadow-xl mx-auto relative z-10">
-                            <div className="w-full h-full rounded-full bg-[#FDFBF7] flex items-center justify-center text-4xl font-black text-[#432818] overflow-hidden">
+                        <div className="w-28 h-28 rounded-full border-4 border-white shadow-xl mx-auto relative z-10 p-1 bg-gradient-to-br from-[#FDFBF7] to-white">
+                            <div className="w-full h-full rounded-full bg-[#f0f0f0] flex items-center justify-center text-4xl font-black text-[#432818] overflow-hidden relative">
                                 {customerProfile?.photoURL ? (
                                     <img src={customerProfile.photoURL} alt="Profil" className="w-full h-full object-cover" />
                                 ) : (
                                     customerProfile?.firstName?.charAt(0) || '?'
                                 )}
                             </div>
+
+                            {/* Tier Badge */}
+                            <div
+                                className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-lg border-2 border-white z-20"
+                                style={{ backgroundColor: getTierColor(currentTier) }}
+                                title={`${currentTier} Üye`}
+                            >
+                                {getTierBadge(currentTier)}
+                            </div>
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            disabled={false} // This button is now part of the main view, not the modal. The modal will handle its own upload state.
-                            className="absolute bottom-0 right-0 p-2.5 bg-[#432818] text-white rounded-xl shadow-lg hover:scale-110 active:scale-90 transition-all z-20"
+                            className="absolute bottom-1 right-8 p-2 bg-[#432818] text-white rounded-full shadow-lg hover:scale-110 active:scale-90 transition-all z-20 border-2 border-white"
                         >
-                            {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} strokeWidth={2.5} />}
+                            {isUploading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} strokeWidth={2.5} />}
                         </button>
                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
                     </div>
 
                     <h2 className="text-2xl font-black text-[#432818] mb-1 tracking-tight font-cinzel">{customerProfile?.firstName} {customerProfile?.lastName}</h2>
-                    <p className={`text-[10px] font-bold tracking-[0.2em] uppercase mb-6 ${isAdmin ? 'text-red-500' : 'text-[#432818]/40'}`}>
-                        {isAdmin ? 'YÖNETİCİ HESABI' : 'Motto Club Üyesi'}
+                    <p className={`text-[11px] font-black tracking-[0.2em] uppercase mb-1 ${isAdmin ? 'text-red-500' : 'text-[#D4AF37]'}`}>
+                        {isAdmin ? 'YÖNETİCİ' : `${currentTier} ÜYE`}
                     </p>
 
-                    <div className="flex justify-center gap-4">
-                        <div className="bg-[#FDFBF7] px-8 py-4 rounded-3xl border border-[#432818]/5 min-w-[140px]">
-                            <div className="text-[#D4AF37] mb-1">
-                                <Zap size={24} className="mx-auto" fill="currentColor" />
+                    {/* Progress Bar */}
+                    {nextTier && (
+                        <div className="max-w-[200px] mx-auto mb-6">
+                            <div className="flex justify-between text-[9px] font-bold text-[#432818]/40 mb-1 uppercase tracking-wider">
+                                <span>{currentPoints} Puan</span>
+                                <span>Hedef: {nextThreshold}</span>
                             </div>
-                            <div className="font-black text-[#432818] text-3xl font-cinzel tracking-tight tabular-nums leading-none">
-                                {customerProfile?.points || 0}
+                            <div className="h-2 bg-[#432818]/5 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-[#D4AF37] rounded-full transition-all duration-1000 ease-out relative overflow-hidden"
+                                    style={{ width: `${progress}%` }}
+                                >
+                                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]"></div>
+                                </div>
                             </div>
-                            <div className="text-[9px] font-bold text-[#432818]/30 uppercase tracking-[0.2em] mt-2">VOLT BAKİYE</div>
+                            <p className="text-[9px] font-medium text-[#432818]/40 mt-1.5">
+                                {nextTier} seviyesine ulaşmak için <span className="text-[#D4AF37] font-bold">{nextThreshold - currentPoints}</span> puan daha gerekli.
+                            </p>
                         </div>
+                    )}
+                    {!nextTier && (
+                        <div className="mb-6 mt-2">
+                            <span className="inline-block px-3 py-1 bg-gradient-to-r from-[#D4AF37] to-[#FDB931] text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                                ZİRVEDESİNİZ 🏆
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Volt Balance Card */}
+                        <div className="bg-[#432818] p-4 rounded-[2rem] shadow-lg shadow-[#432818]/20 relative overflow-hidden group aspect-[4/3] flex flex-col items-center justify-center">
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                            <div className="relative text-center">
+                                <div className="text-[#D4AF37] mb-2 opacity-80">
+                                    <Zap size={28} className="mx-auto" fill="currentColor" />
+                                </div>
+                                <div className="font-black text-white text-3xl font-cinzel tracking-tight tabular-nums leading-none mb-1">
+                                    {customerProfile?.points || 0}
+                                </div>
+                                <div className="text-[9px] font-bold text-white/40 uppercase tracking-[0.2em]">BAKİYE</div>
+                            </div>
+                        </div>
+
+                        {/* Missions Entry Button */}
+                        <button
+                            onClick={() => setShowMissionsModal(true)}
+                            className="bg-[#D4AF37] p-4 rounded-[2rem] shadow-lg shadow-[#432818]/20 relative overflow-hidden group aspect-[4/3] flex flex-col items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all border-2 border-white/20"
+                        >
+                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="relative text-center">
+                                <div className="text-white mb-2">
+                                    <Target size={28} className="mx-auto" strokeWidth={2.5} />
+                                </div>
+                                <div className="font-black text-white text-xl font-cinzel tracking-tight leading-none mb-1">
+                                    GÖREVLER
+                                </div>
+                                <div className="text-[9px] font-bold text-[#432818]/60 uppercase tracking-[0.2em] bg-white/30 rounded-full px-2 py-0.5 inline-block">
+                                    {challenges.filter(c => c.status === 'active').length} AKTİF
+                                </div>
+                            </div>
+                        </button>
                     </div>
+
+                    {/* New Grid Row for Badges & History */}
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                        {/* Badges Button */}
+                        <button
+                            onClick={() => setShowBadgesModal(true)}
+                            className="bg-[#FDFBF7] p-4 rounded-[2rem] shadow-sm relative overflow-hidden group aspect-[4/3] flex flex-col items-center justify-center hover:shadow-md transition-all border border-[#432818]/5"
+                        >
+                            <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37] mb-2 group-hover:scale-110 transition-transform">
+                                <Medal size={24} />
+                            </div>
+                            <div className="font-bold text-[#432818] text-sm uppercase tracking-wider">ROZETLER</div>
+                            <div className="text-[9px] text-[#432818]/40 font-bold mt-1">
+                                {customerProfile?.badges?.length || 0} Kazanıldı
+                            </div>
+                        </button>
+
+                        {/* History Button (Existing functionality, moved/styled here for symmetry) */}
+                        <button
+                            onClick={() => setShowHistoryModal(true)}
+                            className="bg-[#FDFBF7] p-4 rounded-[2rem] shadow-sm relative overflow-hidden group aspect-[4/3] flex flex-col items-center justify-center hover:shadow-md transition-all border border-[#432818]/5"
+                        >
+                            <div className="w-12 h-12 rounded-full bg-[#432818]/5 flex items-center justify-center text-[#432818]/60 mb-2 group-hover:scale-110 transition-transform">
+                                <History size={24} />
+                            </div>
+                            <div className="font-bold text-[#432818] text-sm uppercase tracking-wider">GEÇMİŞ</div>
+                            <div className="text-[9px] text-[#432818]/40 font-bold mt-1">
+                                İşlem Takibi
+                            </div>
+                        </button>
+                    </div>
+
                 </div>
 
                 {/* Menu Groups */}
                 <div className="space-y-8">
+
+
+
+                    {/* Missions Modal */}
+                    <MissionsModal
+                        isOpen={showMissionsModal}
+                        onClose={() => setShowMissionsModal(false)}
+                        challenges={challenges}
+                        onClaim={handleClaimChallenge}
+                    />
+
+                    <BadgesModal
+                        isOpen={showBadgesModal}
+                        onClose={() => setShowBadgesModal(false)}
+                        customerProfile={customerProfile}
+                    />
+
+                    {/* Missions Settings Modal */}
+                    <MissionsSettingsModal
+                        isOpen={showMissionsSettingsModal}
+                        onClose={() => setShowMissionsSettingsModal(false)}
+                        challenges={challenges}
+                        showToast={showToast}
+                    />
+
                     {/* Admin Group */}
                     {isAdmin && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -569,6 +822,12 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                                     label="ÇARK İSTATİSTİKLERİ"
                                     onClick={handleShowWheelStats}
                                     value="ANALİZ"
+                                />
+                                <MenuItem
+                                    icon={Target}
+                                    label="GÖREV YÖNETİMİ"
+                                    onClick={() => setShowMissionsSettingsModal(true)}
+                                    value="AYARLAR"
                                 />
                                 <MenuItem
                                     icon={Disc}
@@ -603,6 +862,30 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                                     }}
                                     value={`${referrerReward || 0}/${refereeReward || 0} V`}
                                 />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tier Benefits Section */}
+                    {customerProfile && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-50">
+                            <h3 className="px-4 mb-3 text-[10px] font-black text-[#432818]/40 uppercase tracking-[0.2em]">Sadakat Programı</h3>
+                            <div className="bg-white rounded-[2rem] shadow-sm border border-[#432818]/5 overflow-hidden">
+                                <button
+                                    onClick={() => setShowTierModal(true)}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-[#FDFBF7] transition-colors group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#D4AF37]/10 to-[#D4AF37]/5 flex items-center justify-center text-2xl">
+                                            {getTierBadge(getTier(customerProfile?.points || 0))}
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="font-black text-sm text-[#432818]">{getTier(customerProfile?.points || 0)} ÜYE</div>
+                                            <div className="text-[10px] text-[#432818]/50 font-bold uppercase tracking-wider">Ayrıcalıkları Gör</div>
+                                        </div>
+                                    </div>
+                                    <ChevronRight size={18} className="text-[#432818]/30 group-hover:text-[#D4AF37] transition-colors" />
+                                </button>
                             </div>
                         </div>
                     )}
@@ -667,6 +950,8 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                 onClose={() => setShowEditModal(false)}
                 customerProfile={customerProfile}
                 showToast={showToast}
+                referrerReward={referrerReward}
+                refereeReward={refereeReward}
             />
 
             {/* Point History Modal */}
@@ -811,6 +1096,13 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                 isOpen={showHelpModal}
                 onClose={() => setShowHelpModal(false)}
                 t={t}
+            />
+
+            {/* Tier Benefits Modal */}
+            <TierBenefitsModal
+                isOpen={showTierModal}
+                onClose={() => setShowTierModal(false)}
+                customerProfile={customerProfile}
             />
         </div >
     );

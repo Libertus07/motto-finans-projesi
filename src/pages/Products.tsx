@@ -17,14 +17,17 @@ import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 import SortableProductItem from '../components/products/SortableProductItem';
 import { Product } from '../types';
 
-interface ProductsProps {
-    products: Product[];
-    userRole: string | null;
-    canEdit: boolean;
-    categories: { id: string; name: string }[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
+import { usePermissions } from '../hooks/usePermissions';
+import { PERMISSIONS } from '../utils/roles';
 
-const Products: React.FC<ProductsProps> = ({ products, userRole, canEdit, categories }) => {
+const Products: React.FC = () => {
+    const { products, categories } = useOutletContext<DashboardContextType>();
+
+    // 🔥 PERMISSION CHECK
+    const { hasPermission } = usePermissions();
+    const canEdit = hasPermission(PERMISSIONS.PRODUCT_MANAGE);
 
     const activeCats = categories && categories.length > 0 ? categories : [{ id: 'def', name: 'Tümü' }];
 

@@ -15,6 +15,8 @@ interface TransactionHistoryProps {
     filteredTotals: { income: number; expense: number };
     handleDeleteTransaction: (id: string) => void;
     isPatron: boolean;
+    onLoadMore?: () => void;
+    isLoadingMore?: boolean;
 }
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
@@ -26,7 +28,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     setFilterType,
     filteredTotals,
     handleDeleteTransaction,
-    isPatron
+    isPatron,
+    onLoadMore,
+    isLoadingMore
 }) => {
     // 🚀 PERFORMANS: Sanallaştırma için veriyi hazırla
     const { groupCounts, groupLabels, flatTransactions } = useMemo(() => {
@@ -84,8 +88,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                                 key={t}
                                 onClick={() => setFilterType(t)}
                                 className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all ${filterType === t
-                                        ? (t === 'income' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white')
-                                        : 'text-slate-500'
+                                    ? (t === 'income' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white')
+                                    : 'text-slate-500'
                                     }`}
                             >
                                 {t === 'all' ? 'TİP' : t === 'income' ? 'GELİR' : 'GİDER'}
@@ -178,6 +182,19 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                     <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
                         <History size={48} strokeWidth={1} className="mb-2" />
                         <p className="text-xs font-bold">İşlem bulunamadı</p>
+                    </div>
+                )}
+
+                {/* Load More Button */}
+                {onLoadMore && filteredAndSortedTransactions.length > 0 && filterPeriod === 'all' && (
+                    <div className="p-4 border-t border-slate-800/50 bg-slate-900/40 text-center">
+                        <button
+                            onClick={onLoadMore}
+                            disabled={isLoadingMore}
+                            className="text-xs font-bold text-indigo-400 hover:text-indigo-300 disabled:opacity-50 transition-colors"
+                        >
+                            {isLoadingMore ? "Yükleniyor..." : "Daha Fazla Göster"}
+                        </button>
                     </div>
                 )}
             </div>

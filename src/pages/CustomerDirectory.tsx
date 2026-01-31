@@ -9,9 +9,7 @@ import { db, appId, functions, httpsCallable } from '../services/firebase';
 import { TableVirtuoso } from 'react-virtuoso'; // ✨ Performans için eklendi
 import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 
-interface CustomerDirectoryProps {
-    isDarkMode: boolean;
-}
+import { useTheme } from '../hooks/pos/useTheme';
 
 interface Customer {
     id: string;
@@ -31,7 +29,8 @@ interface OrderHistoryItem {
     [key: string]: any;
 }
 
-const CustomerDirectory: React.FC<CustomerDirectoryProps> = ({ isDarkMode }) => {
+const CustomerDirectory: React.FC = () => {
+    const [isDarkMode] = useTheme();
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -219,8 +218,8 @@ const CustomerDirectory: React.FC<CustomerDirectoryProps> = ({ isDarkMode }) => 
                                     <td className="p-6 font-mono text-sm text-slate-500" onClick={() => setSelectedCustomer(customer)}>{customer.phone}</td>
                                     <td className="p-6" onClick={() => setSelectedCustomer(customer)}>
                                         <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black border ${customer.tier === 'VIP'
-                                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-500'
-                                                : 'bg-slate-500/10 border-slate-500/20 text-slate-500'
+                                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-500'
+                                            : 'bg-slate-500/10 border-slate-500/20 text-slate-500'
                                             }`}>
                                             {customer.tier || 'Üye'}
                                         </span>

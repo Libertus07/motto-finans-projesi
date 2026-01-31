@@ -6,6 +6,7 @@ import { useSettings } from './pos/useSettings';
 import { useFinancials } from './pos/useFinancials';
 import { useFinanceStats } from './pos/useFinanceStats';
 import { User, FixedCosts } from '../types';
+import { INITIAL_MARKET_RATES } from '../utils/constants';
 
 export default function useFinanceData(user: User | null | undefined) {
     // 1. Data Hooks
@@ -16,7 +17,7 @@ export default function useFinanceData(user: User | null | undefined) {
     const { transactions, investments, debts, ingredients, quickActions, loading: loadingFinancials } = useFinancials(user);
 
     // 2. Local State
-    const [marketRates, setMarketRates] = useState({ gold: 2950, dollar: 34.50, euro: 37.20 });
+    const [marketRates, setMarketRates] = useState<Record<string, number>>(INITIAL_MARKET_RATES);
 
     // 3. Stats Calculation (Pure Logic)
     const { stats, calculateFutureCashflow, getProfitabilityWarnings } = useFinanceStats({

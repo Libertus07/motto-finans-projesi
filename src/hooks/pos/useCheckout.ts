@@ -85,6 +85,11 @@ export const useCheckout = ({
 
                     if (updateResult.completed) {
                         setSuccessMsg(`Hesap tamamen kapatıldı! ₺${formatCurrency(updateResult.newPaid)} tahsil edildi.`);
+                        // 🔥 STOK DÜŞÜMÜ (Phase 3)
+                        try {
+                            const { StockService } = await import('../../services/stock.service');
+                            await StockService.processOrderStockDeduction(cartHook.cart);
+                        } catch (err) { console.error('Stok düşümü hatası:', err); }
                         resetAfterPayment();
                     } else {
                         setSuccessMsg(`₺${formatCurrency(currentPayable)} tahsil edildi. Kalan: ₺${formatCurrency(totals.finalTotal - updateResult.newPaid)}`);
@@ -95,6 +100,12 @@ export const useCheckout = ({
                     }
                 } else {
                     // Normal tam ödeme
+                    // 🔥 STOK DÜŞÜMÜ (Phase 3)
+                    try {
+                        const { StockService } = await import('../../services/stock.service');
+                        await StockService.processOrderStockDeduction(cartHook.cart);
+                    } catch (err) { console.error('Stok düşümü hatası:', err); }
+
                     setSuccessMsg(`₺${formatCurrency(currentPayable)} Tahsil Edildi`);
                     resetAfterPayment();
                 }

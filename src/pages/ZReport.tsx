@@ -6,23 +6,23 @@ import { formatCurrency } from '../utils/helpers';
 import Receipt from '../components/Receipt';
 import { Transaction } from '../types';
 
-interface ZReportProps {
-    transactions: Transaction[];
-}
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '../types';
 
-interface ReportSummary {
-    grossSales: number;
-    cashSales: number;
-    cardSales: number;
-    totalExpense: number;
-    totalTransactions: number;
-    totalManualDiscount: number;
-    totalLoyaltyDiscount: number;
-    grandTotalDiscount: number;
-    netCiro: number;
-}
+const ZReport: React.FC = () => {
+    const { transactions } = useOutletContext<DashboardContextType>();
 
-const ZReport: React.FC<ZReportProps> = ({ transactions }) => {
+    interface ReportSummary {
+        grossSales: number;
+        cashSales: number;
+        cardSales: number;
+        totalExpense: number;
+        totalTransactions: number;
+        totalManualDiscount: number;
+        totalLoyaltyDiscount: number;
+        grandTotalDiscount: number;
+        netCiro: number;
+    }
     const [printData, setPrintData] = useState<any>(null);
     const today = new Date().toISOString().split('T')[0];
 

@@ -17,9 +17,9 @@ export const useQrMenuData = () => {
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
     // Data State
-    const [cart, setCart] = useState<any[]>([]);
+    const [cart, setCart] = useState<any[]>([]); // Keep any for cart as it has dynamic customizations for now
     const [searchQuery, setSearchQuery] = useState('');
-    const [tableInfo, setTableInfo] = useState<any>(null);
+    const [tableInfo, setTableInfo] = useState<any>(null); // Keep any for tableInfo as it's modified dynamically here
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -33,8 +33,9 @@ export const useQrMenuData = () => {
     // Gamification & Engagement State
     const [isWheelOpen, setIsWheelOpen] = useState(false);
     const [isOracleOpen, setIsOracleOpen] = useState(false);
-    const [isTriviaOpen, setIsTriviaOpen] = useState(false);
+    const [isScratchOpen, setIsScratchOpen] = useState(false);
     const [isHubOpen, setIsHubOpen] = useState(false);
+    const [isAssistantOpen, setIsAssistantOpen] = useState(false);
     const [upsellItem, setUpsellItem] = useState<Product | null>(null);
 
     // Item Detail State
@@ -66,8 +67,11 @@ export const useQrMenuData = () => {
     useEffect(() => {
         let unsubProfile: (() => void) | null = null;
         let unsubSettings: (() => void) | null = null;
+        let unsubTable: (() => void) | null = null;
+        let unsubAuth: (() => void) | null = null;
+        let presenceInterval: NodeJS.Timeout | null = null;
 
-        const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+        unsubAuth = onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
                 if (currentUser.isAnonymous) {
                     setIsMember(false);
@@ -83,11 +87,22 @@ export const useQrMenuData = () => {
             }
         });
 
-        let unsubTable = () => { };
         if (tableId) {
             unsubTable = onSnapshot(doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'tables', tableId), (doc) => {
                 if (doc.exists()) setTableInfo({ id: doc.id, ...doc.data() });
             });
+
+            // Update Presence
+            const updatePresence = async () => {
+                try {
+                    const tableRef = doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'tables', tableId);
+                    await updateDoc(tableRef, { lastActivity: new Date().toISOString() });
+                } catch {
+                    // console.error("Presence update failed"); // Silent fail
+                }
+            };
+            updatePresence();
+            presenceInterval = setInterval(updatePresence, 30000);
         }
 
         const unsubProds = onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'products'), (snap) => {
@@ -96,7 +111,7 @@ export const useQrMenuData = () => {
             setLoading(false);
         });
 
-        // Ayarları Dinle (Hoşgeldin Bonusu vb.)
+        // Ayarları Dinle
         unsubSettings = onSnapshot(doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'settings', 'loyalty'), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
@@ -107,13 +122,43 @@ export const useQrMenuData = () => {
         });
 
         return () => {
-            unsubscribeAuth();
-            unsubTable();
-            unsubProds();
+            if (unsubAuth) unsubAuth();
+            if (unsubTable) unsubTable();
+            if (unsubProds) unsubProds();
             if (unsubProfile) unsubProfile();
             if (unsubSettings) unsubSettings();
+            if (presenceInterval) clearInterval(presenceInterval);
         };
     }, [tableId]);
+
+    // ✨ PROACTIVE VIP DETECTION
+    useEffect(() => {
+        if (tableId && customerProfile?.isVIP && !tableInfo?.isVIP) {
+            const updateTableVIP = async () => {
+                try {
+                    const tableRef = doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'tables', tableId);
+                    await updateDoc(tableRef, { isVIP: true });
+                } catch (e) {
+                    console.error("Failed to auto-set VIP on table", e);
+                }
+            };
+            updateTableVIP();
+        }
+    }, [customerProfile, tableId, tableInfo?.isVIP]);
+
+    // 🖼️ CATEGORY IMAGES
+    const [categoryImages, setCategoryImages] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        const unsubImages = onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'categories'), (snapshot) => {
+            const images: Record<string, string> = {};
+            snapshot.docs.forEach(doc => {
+                images[doc.id] = doc.data().image;
+            });
+            setCategoryImages(images);
+        });
+        return () => unsubImages();
+    }, []);
 
     // Derived State
     const categories = useMemo(() => [...new Set(products.map(item => item.category))], [products]);
@@ -127,13 +172,48 @@ export const useQrMenuData = () => {
     }, [products, categories]);
 
     const isAdmin = useMemo(() => {
-        return (customerProfile as any)?.role === 'admin' || (customerProfile as any)?.isAdmin === true;
+        return customerProfile?.role === 'admin' || customerProfile?.isAdmin === true;
     }, [customerProfile]);
 
 
     // Actions
     const scrollToCategory = (category: string) => {
         setActiveCategory(category);
+        window.scrollTo({ top: 0, behavior: 'auto' });
+    };
+
+    const toggleFavorite = async (product: Product) => {
+        if (!isMember || !customerProfile) {
+            setIsAuthModalOpen(true);
+            return;
+        }
+
+        const isFav = customerProfile.favorites?.includes(product.id);
+        const customerRef = doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'customers', customerProfile.uid);
+
+        try {
+            if (isFav) {
+                // Remove from favorites
+                await updateDoc(customerRef, {
+                    favorites: customerProfile.favorites?.filter(id => id !== product.id)
+                });
+                // Also update local product state if needed, but onSnapshot handles it for customerProfile.
+                // However, we need to update the product document's isFavorite field if it's user-specific or global?
+                // Actually, 'isFavorite' on product is usually global or per-user. 
+                // Given the type definition, it seems Product.isFavorite is a boolean. 
+                // If this is a per-user favorite, we rely on customerProfile.favorites list.
+                showToast('Favorilerden çıkarıldı', 'success');
+            } else {
+                // Add to favorites
+                await updateDoc(customerRef, {
+                    favorites: arrayUnion(product.id)
+                });
+                showToast('Favorilere eklendi', 'success');
+            }
+        } catch (error) {
+            console.error("Error toggling favorite:", error);
+            showToast('Bir hata oluştu', 'error');
+        }
     };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -158,6 +238,7 @@ export const useQrMenuData = () => {
                 total: increment(totalAmount),
                 status: 'occupied',
                 lastOrderTime: new Date().toISOString(),
+                isVIP: tableInfo?.isVIP || customerProfile?.isVIP || false,
                 ...(tableInfo?.status === 'empty' ? { startTime: new Date().toISOString() } : {})
             });
 
@@ -447,8 +528,9 @@ export const useQrMenuData = () => {
         isServiceModalOpen, setIsServiceModalOpen,
         isWheelOpen, setIsWheelOpen,
         isOracleOpen, setIsOracleOpen,
-        isTriviaOpen, setIsTriviaOpen,
+        isScratchOpen, setIsScratchOpen,
         isHubOpen, setIsHubOpen,
+        isAssistantOpen, setIsAssistantOpen,
         upsellItem, setUpsellItem,
         selectedProduct, setSelectedProduct,
         categories,
@@ -467,6 +549,8 @@ export const useQrMenuData = () => {
         isAdmin,
         welcomeBonus,
         referrerReward,
-        refereeReward
+        refereeReward,
+        toggleFavorite,
+        categoryImages
     };
 };

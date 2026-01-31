@@ -36,8 +36,16 @@ const FlyingElement = ({ item, onComplete }: { item: FlyingItem, onComplete: () 
 
     useEffect(() => {
         // Hedef: Ekranın alt ortası (Sepet ikonu civarı)
-        const targetX = window.innerWidth / 2 - 25;
-        const targetY = window.innerHeight - 80; // BottomNav yüksekliği kadar yukarı
+        // Hedef: Ekranın alt ortası (Sepet ikonu civarı)
+        let targetX = window.innerWidth / 2 - 25;
+        let targetY = window.innerHeight - 80; // BottomNav yüksekliği kadar yukarı
+
+        const cartBtn = document.getElementById('cart-nav-button');
+        if (cartBtn) {
+            const rect = cartBtn.getBoundingClientRect();
+            targetX = rect.left + (rect.width / 2) - 25; // Center
+            targetY = rect.top + (rect.height / 2) - 25;
+        }
 
         // Bir sonraki frame'de animasyonu başlat
         requestAnimationFrame(() => {

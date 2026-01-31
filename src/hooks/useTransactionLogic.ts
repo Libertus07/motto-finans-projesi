@@ -10,7 +10,7 @@ import { Transaction, QuickAction } from '../types';
 
 // Extend jsPDF for autotable
 interface jsPDFWithAutoTable extends jsPDF {
-    autoTable: (options: any) => void;
+    autoTable: (options: unknown) => void;
 }
 
 export const useTransactionLogic = (transactions: Transaction[]) => {

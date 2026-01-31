@@ -147,17 +147,21 @@ export interface Table {
     staffId?: ID | null;
     startTime?: ISODateString | null;
     lastOrderTime?: ISODateString | null;
+    lastActivity?: ISODateString | null;
+    isVIP?: boolean;
 
     // Reservation
     reservation?: {
         customerName: string;
         time: string; // "19:30"
         note?: string;
+        isVIP?: boolean;
     } | null;
 
     // Service Requests
     requests?: {
-        type: 'waiter' | 'bill';
+        id: string;
+        type: 'waiter' | 'bill' | 'ashtray' | 'other' | 'special';
         time: string;
         status: 'pending' | 'completed';
     }[];
@@ -286,20 +290,54 @@ export interface LoyaltyCustomer {
     [key: string]: string | number | string[] | undefined;
 }
 
+export type LoyaltyTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+
+export interface Challenge {
+    id: string;
+    title: string;
+    description: string;
+    reward: number;
+    target: number;
+    progress: number;
+    status: 'active' | 'completed' | 'claimed';
+    icon: string;
+    type: 'profile' | 'order_count' | 'spend_amount' | 'referral' | 'social' | 'custom';
+    criteria?: string;
+}
+
+export interface Badge {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    condition: 'first_order' | 'order_count_10' | 'order_count_50' | 'spend_1000' | 'coffee_lover' | 'night_owl' | 'early_bird' | 'social_star' | 'profile_master' | 'vip' | 'legend';
+    rarity: 'common' | 'rare' | 'epic' | 'legendary';
+    earnedDate?: string;
+}
+
 export interface CustomerProfile {
     uid: string;
     firstName: string;
     lastName: string;
     phone: string;
     email: string;
+    isVIP?: boolean;
     birthday: string;
     points: number;
     favorites: string[];
     createdAt: string;
+    role?: string;
+    isAdmin?: boolean;
     lastSpinDate?: string; // YYYY-MM-DD
     coffeeStamps?: number;
     photoURL?: string;
     personalInviteCode?: string;
+    referredBy?: string; // ID or Code of referrer
+    badges?: string[]; // IDs of earned badges
+    claimedChallenges?: string[];
+    totalOrders?: number;
+    totalSpend?: number;
+    referralCount?: number;
 }
 
 // Settings Categories
@@ -316,6 +354,8 @@ export interface Deal {
     expiresAt?: string;
     image?: string;
     isActive?: boolean;
+    discountValue: number;
+    discountType: 'percentage' | 'fixed';
 }
 
 export interface Notification {
@@ -400,4 +440,28 @@ export interface ReceiptData {
     paid?: number;
     remaining?: number;
     orderNo?: number;
+}
+
+export interface DashboardContextType {
+    transactions: Transaction[];
+    products: Product[];
+    investments: Investment[];
+    debts: Debt[];
+    ingredients: Ingredient[];
+    quickActions: QuickAction[];
+    tables: Table[];
+    fixedCosts: FixedCosts;
+    setFixedCosts: (val: FixedCosts) => void;
+    monthlyGoal: number;
+    setMonthlyGoal: (val: number) => void;
+    marketRates: Record<string, number>;
+    stats: FinancialStats;
+    staff: Staff[];
+    categories: Category[];
+    loading: boolean;
+    userRole: string | null;
+    customers: LoyaltyCustomer[];
+    loyaltySettings: LoyaltySettings;
+    setLoyaltySettings: (val: LoyaltySettings) => void;
+    currentStaff: Staff | null;
 }
