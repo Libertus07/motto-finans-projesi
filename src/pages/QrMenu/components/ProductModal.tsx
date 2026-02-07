@@ -215,8 +215,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose, o
                                                                 key={size}
                                                                 onClick={() => setSelectedSize(size)}
                                                                 className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${selectedSize === size
-                                                                        ? 'bg-[#432818] text-[#D4AF37] border-[#432818] shadow-[0_10px_20px_rgba(67,40,24,0.2)]'
-                                                                        : 'bg-white text-[#432818]/40 border-[#432818]/5 hover:border-[#D4AF37]/30'
+                                                                    ? 'bg-[#432818] text-[#D4AF37] border-[#432818] shadow-[0_10px_20px_rgba(67,40,24,0.2)]'
+                                                                    : 'bg-white text-[#432818]/40 border-[#432818]/5 hover:border-[#D4AF37]/30'
                                                                     }`}
                                                             >
                                                                 {size}
@@ -262,26 +262,26 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose, o
                         </div>
 
                         {/* --- Sticky Footer (3D) --- */}
-                        <div className="absolute bottom-0 inset-x-0 p-8 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7] to-transparent pt-16 z-[70]">
+                        <div className="absolute bottom-0 inset-x-0 p-8 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7] to-transparent pt-20 z-[70] backdrop-blur-[2px]">
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
+                                whileTap={{ scale: 0.96 }}
                                 onClick={handleAdd}
                                 disabled={product.stock !== undefined && product.stock <= 0}
-                                className={`w-full py-6 rounded-[2rem] font-black text-xl font-cinzel tracking-[0.2em] shadow-[0_25px_50px_rgba(67,40,24,0.3)] flex items-center justify-center gap-5 relative overflow-hidden group/btn transition-all ${product.stock !== undefined && product.stock <= 0
-                                        ? 'bg-slate-400 text-white cursor-not-allowed opacity-80'
-                                        : 'bg-[#432818] text-[#D4AF37] border border-white/10'
+                                className={`w-full py-6 rounded-[2.5rem] font-black text-xl font-cinzel tracking-[0.2em] shadow-[0_25px_50px_rgba(67,40,24,0.3)] flex items-center justify-center gap-5 relative overflow-hidden group/btn transition-all ${product.stock !== undefined && product.stock <= 0
+                                    ? 'bg-slate-400 text-white cursor-not-allowed opacity-80'
+                                    : 'bg-[#432818] text-[#D4AF37] border border-white/20'
                                     }`}
                                 style={{ transform: "translateZ(80px)" }}
                             >
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-[1.5s] ease-in-out" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-[1.5s] ease-in-out" />
 
                                 <span className="relative z-10">
                                     {product.stock !== undefined && product.stock <= 0 ? 'TÜKENDİ' : t('add_to_cart')}
                                 </span>
 
                                 {!(product.stock !== undefined && product.stock <= 0) && (
-                                    <div className="w-12 h-12 bg-[#D4AF37] text-[#432818] rounded-full flex items-center justify-center relative z-10 group-hover/btn:rotate-90 transition-transform duration-500 shadow-[0_0_20px_rgba(212,175,55,0.4)]">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-[#D4AF37] to-[#B8860B] text-[#432818] rounded-full flex items-center justify-center relative z-10 group-hover:rotate-90 group-active:scale-90 transition-all duration-500 shadow-[0_0_20px_rgba(212,175,55,0.4)] border border-white/20">
                                         <Plus size={28} strokeWidth={3} />
                                     </div>
                                 )}

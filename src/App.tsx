@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import DashboardLayout from './layouts/DashboardLayout';
-import CustomerLoyalty from './pages/CustomerLoyalty';
+
 import QrMenu from './pages/QrMenu/QrMenu';
 import KitchenDisplay from './pages/KitchenDisplay';
 
@@ -33,7 +33,7 @@ export default function App() {
             </Suspense>
             <Routes>
                 {/* Public / Standalone Routes */}
-                <Route path="/plus" element={<CustomerLoyalty />} />
+
                 <Route path="/qr-menu" element={<QrMenu />} />
                 <Route path="/kitchen" element={<KitchenDisplay />} />
 

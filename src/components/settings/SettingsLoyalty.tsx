@@ -24,7 +24,7 @@ const SettingsLoyalty: React.FC<SettingsLoyaltyProps> = ({ loyaltySettings, hand
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-white">
-                                Sadakat & Otomatik Hediye
+                                Motto Club & Otomatik Hediye
                             </h3>
                             <p className="text-xs text-slate-400 mt-1">
                                 Üyelere verilecek otomatik ödül kuralları
@@ -55,7 +55,7 @@ const SettingsLoyalty: React.FC<SettingsLoyaltyProps> = ({ loyaltySettings, hand
                                     onChange={(e) => handleUpdateLoyaltySetting('welcomeBonus', e.target.value)}
                                     className="flex-1 bg-white/5 border-2 border-white/10 rounded-2xl px-4 py-3 text-white text-xl font-black outline-none focus:border-indigo-500 transition-all"
                                 />
-                                <span className="text-sm text-slate-400 font-bold">M-Coin</span>
+                                <span className="text-sm text-slate-400 font-bold">Volt</span>
                             </div>
                         </div>
                         {/* Doğum Günü Bonus */}
@@ -80,7 +80,7 @@ const SettingsLoyalty: React.FC<SettingsLoyaltyProps> = ({ loyaltySettings, hand
                                     onChange={(e) => handleUpdateLoyaltySetting('birthdayBonus', e.target.value)}
                                     className="flex-1 bg-white/5 border-2 border-white/10 rounded-2xl px-4 py-3 text-white text-xl font-black outline-none focus:border-purple-500 transition-all"
                                 />
-                                <span className="text-sm text-slate-400 font-bold">M-Coin</span>
+                                <span className="text-sm text-slate-400 font-bold">Volt</span>
                             </div>
                         </div>
                     </div>
@@ -90,7 +90,7 @@ const SettingsLoyalty: React.FC<SettingsLoyaltyProps> = ({ loyaltySettings, hand
                         <Info size={20} className="text-indigo-400 shrink-0 mt-0.5" />
                         <div>
                             <p className="text-xs text-indigo-300 font-bold">
-                                10 M-Coin = 5 ₺ değerindedir
+                                10 Volt = 5 ₺ değerindedir
                             </p>
                             <p className="text-[10px] text-slate-400 mt-1">
                                 Üyeler kazandıkları puanları ödeme anında indirim olarak kullanabilir.

@@ -101,10 +101,10 @@ const CartPanel: React.FC<CartPanelProps> = ({
 }) => {
     return (
         <div className={`
-            absolute inset-0 lg:static w-full lg:w-[460px] 
+            absolute inset-0 lg:static w-full lg:w-[460px] lg:min-w-[460px]
             lg:rounded-3xl lg:border lg:shadow-2xl 
             flex flex-col shrink-0 h-full 
-            transition-transform duration-500 ease-in-out z-20 
+            transition-transform duration-500 ease-in-out z-30 
             ${activeTab === 'cart' ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} 
             ${isDarkMode ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200'}
         `}>

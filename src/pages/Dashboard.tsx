@@ -4,7 +4,6 @@ import HeroCard from '../components/Dashboard/HeroCard';
 import KPIGrid from '../components/Dashboard/KPIGrid';
 import PowerGrid from '../components/Dashboard/PowerGrid';
 import AssetManagement from '../components/Dashboard/AssetManagement';
-import LoyaltyAnalysis from '../components/Dashboard/LoyaltyAnalysis';
 import OccupancyIndicator from '../components/Dashboard/OccupancyIndicator';
 import LiveScanMonitor from '../components/Dashboard/LiveScanMonitor';
 import AssetDetailModal from '../components/Dashboard/AssetDetailModal';
@@ -87,14 +86,6 @@ const Dashboard: React.FC = () => {
                 investment={calculations.investment}
                 getAssetRatio={calculations.getAssetRatio}
                 setSelectedAssetInfo={setSelectedAssetInfo}
-            />
-
-            <LoyaltyAnalysis
-                topLoyaltyProductReal={calculations.topLoyaltyProductReal ? {
-                    name: calculations.topLoyaltyProductReal.name,
-                    share: Number(calculations.topLoyaltyProductReal.share)
-                } : { name: '', share: 0 }}
-                loyaltyAnalytics={calculations.loyaltyAnalytics}
             />
 
             <OccupancyIndicator

@@ -53,6 +53,7 @@ const Products: React.FC = () => {
         message: ''
     });
     const [toast, setToast] = useState<string | null>(null);
+    const [gridCols, setGridCols] = useState(4);
 
     useEffect(() => {
         if (categories && categories.length > 0 && !newProduct.category) {
@@ -209,8 +210,12 @@ const Products: React.FC = () => {
     }, [localProducts, activeCategory, searchTerm]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-24">
+        <div className="min-h-screen bg-[#020617] relative overflow-hidden text-slate-200">
+            {/* Ambient Background Glows */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-violet-500/10 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10 pb-32 relative z-10">
 
                 {/* Modals */}
                 <ConfirmationModal
@@ -253,155 +258,162 @@ const Products: React.FC = () => {
                 )}
 
                 {/* Header Section */}
-                <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 blur-3xl -z-10" />
-
-                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 pb-6 border-b border-slate-800/50">
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-3 rounded-2xl shadow-lg shadow-indigo-500/20">
-                                    <Coffee size={32} className="text-white" />
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 pb-8 border-b border-white/5">
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-4">
+                            <div className="relative group">
+                                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                                <div className="relative bg-slate-900 p-3.5 rounded-2xl border border-white/10 shadow-xl">
+                                    <Package size={28} className="text-indigo-400" />
                                 </div>
-                                <div>
-                                    <h2 className="text-3xl lg:text-4xl font-black text-white tracking-tight">
-                                        Menü Yönetimi
-                                    </h2>
-                                    <div className="flex items-center gap-3 mt-1">
-                                        <p className="text-slate-400 text-sm">
-                                            <span className="text-white font-bold">{localProducts?.length || 0}</span> ürün
-                                        </p>
-                                        {localProducts?.length > 0 && (
-                                            <>
-                                                <span className="text-slate-700">•</span>
-                                                <p className="text-slate-400 text-sm flex items-center gap-1.5">
-                                                    <TrendingUp size={14} className="text-emerald-400" />
-                                                    <span className="text-emerald-400 font-bold">
-                                                        {localProducts.reduce((sum, p) => sum + (p.sold || 0), 0)}
-                                                    </span> satış
-                                                </p>
-                                            </>
-                                        )}
+                            </div>
+                            <div>
+                                <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+                                    Menü Yönetimi
+                                </h1>
+                                <div className="flex items-center gap-4 mt-2">
+                                    <div className="flex items-center gap-2 bg-slate-900/50 backdrop-blur-sm px-3 py-1 rounded-full border border-white/5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                        <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">
+                                            {localProducts?.length || 0} Ürün
+                                        </span>
                                     </div>
+                                    {localProducts?.length > 0 && (
+                                        <div className="flex items-center gap-2 bg-emerald-500/10 backdrop-blur-sm px-3 py-1 rounded-full border border-emerald-500/20">
+                                            <TrendingUp size={12} className="text-emerald-400" />
+                                            <span className="text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                                                {localProducts.reduce((sum, p) => sum + (p.sold || 0), 0)} Satış
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-                            {!canEdit && (
-                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 text-slate-400 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg">
-                                    <Eye size={16} className="text-indigo-400" />
-                                    Görüntüleme Modu
-                                </div>
-                            )}
-                            {canEdit && (
-                                <>
-                                    <button
-                                        onClick={() => setIsCatManagerOpen(true)}
-                                        className="px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 text-slate-300 border border-slate-700/50 hover:border-indigo-500/30 transition-all shadow-lg backdrop-blur-sm text-sm group"
-                                    >
-                                        <LayoutList size={18} className="group-hover:scale-110 transition-transform" />
-                                        Kategori
-                                    </button>
+                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        {!canEdit && (
+                            <div className="flex-1 md:flex-none bg-slate-900/40 backdrop-blur-md border border-white/10 text-slate-400 px-5 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-3">
+                                <Eye size={16} className="text-indigo-400" />
+                                SADECE GÖRÜNTÜLEME
+                            </div>
+                        )}
+                        {canEdit && (
+                            <>
+                                <button
+                                    onClick={() => setIsCatManagerOpen(true)}
+                                    className="flex-1 md:flex-none px-5 py-3 rounded-2xl font-bold text-sm bg-slate-900/40 hover:bg-slate-800/60 text-slate-300 border border-white/5 hover:border-white/10 transition-all flex items-center justify-center gap-2.5 shadow-lg group"
+                                >
+                                    <LayoutList size={18} className="text-indigo-400 group-hover:scale-110 transition-transform" />
+                                    Kategoriler
+                                </button>
 
-                                    <button
-                                        onClick={() => setIsOptionModalOpen(true)}
-                                        className="px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 text-indigo-400 border border-slate-700/50 hover:border-indigo-500/50 transition-all shadow-lg backdrop-blur-sm text-sm group"
-                                    >
-                                        <ListPlus size={18} className="group-hover:scale-110 transition-transform" />
-                                        Seçenek
-                                    </button>
+                                <button
+                                    onClick={() => setIsOptionModalOpen(true)}
+                                    className="flex-1 md:flex-none px-5 py-3 rounded-2xl font-bold text-sm bg-slate-900/40 hover:bg-slate-800/60 text-slate-300 border border-white/5 hover:border-white/10 transition-all flex items-center justify-center gap-2.5 shadow-lg group"
+                                >
+                                    <ListPlus size={18} className="text-violet-400 group-hover:scale-110 transition-transform" />
+                                    Seçenekler
+                                </button>
 
-                                    <button
-                                        onClick={() => setIsFormOpen(!isFormOpen)}
-                                        className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg text-sm group ${isFormOpen
-                                            ? 'bg-slate-700/50 text-slate-300 border border-slate-600/50'
-                                            : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-900/30 border border-indigo-500/20'
-                                            }`}
-                                    >
+                                <button
+                                    onClick={() => setIsFormOpen(!isFormOpen)}
+                                    className={`w-full md:w-auto px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-xl flex items-center justify-center gap-2.5 relative overflow-hidden group ${isFormOpen
+                                        ? 'bg-slate-800 text-slate-400 border border-white/5'
+                                        : 'bg-gradient-to-r from-indigo-600 to-violet-700 text-white border border-white/10 hover:shadow-indigo-500/20'
+                                        }`}
+                                >
+                                    {!isFormOpen && (
+                                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-violet-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    )}
+                                    <span className="relative flex items-center gap-2.5">
                                         {isFormOpen ? (
                                             <>
-                                                <Grid size={18} className="group-hover:scale-110 transition-transform" />
-                                                Listeye Dön
+                                                <X size={18} /> Vazgeç
                                             </>
                                         ) : (
                                             <>
-                                                <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                                                Yeni Ürün
+                                                <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" /> Yeni Ürün
                                             </>
                                         )}
-                                    </button>
-                                </>
-                            )}
-                        </div>
+                                    </span>
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
                 {/* Option Modal */}
                 {isOptionModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
-                        <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/50 w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                                    <div className="bg-gradient-to-br from-purple-500 to-pink-500 p-2 rounded-xl">
-                                        <Settings className="text-white" size={20} />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#020617]/80 backdrop-blur-xl animate-in fade-in duration-300">
+                        <div className="bg-slate-900 border border-white/10 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                            <div className="p-8 space-y-8">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="bg-violet-500/10 p-2.5 rounded-2xl border border-violet-500/20">
+                                            <Settings className="text-violet-400" size={24} />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-white tracking-tight">Yeni Seçenek</h3>
                                     </div>
-                                    Seçenek Ekle
-                                </h3>
-                                <button
-                                    onClick={() => setIsOptionModalOpen(false)}
-                                    className="p-2 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-all"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs text-slate-400 font-bold block mb-2 uppercase tracking-wider">Hangi Ürüne?</label>
-                                    <select
-                                        value={optionData.productId}
-                                        onChange={(e) => setOptionData({ ...optionData, productId: e.target.value })}
-                                        className="w-full bg-slate-800/50 border border-slate-600/50 rounded-xl p-3.5 text-white outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all custom-scrollbar"
-                                    >
-                                        <option value="">Ürün Seçiniz...</option>
-                                        {localProducts.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs text-slate-400 font-bold block mb-2 uppercase tracking-wider">Seçenek Adı</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ör: Ekstra Shot"
-                                        value={optionData.name}
-                                        onChange={(e) => setOptionData({ ...optionData, name: e.target.value })}
-                                        className="w-full bg-slate-800/50 border border-slate-600/50 rounded-xl p-3.5 text-white outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-slate-400 font-bold block mb-2 uppercase tracking-wider">Fiyat Farkı (₺)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        value={optionData.priceDiff}
-                                        onChange={(e) => setOptionData({ ...optionData, priceDiff: e.target.value })}
-                                        className="w-full bg-slate-800/50 border border-slate-600/50 rounded-xl p-3.5 text-white outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-mono"
-                                        step="0.01"
-                                    />
-                                </div>
-                                <div className="flex gap-3 pt-4">
                                     <button
                                         onClick={() => setIsOptionModalOpen(false)}
-                                        className="flex-1 py-3.5 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded-xl font-bold transition-all border border-slate-700/50"
+                                        className="p-2.5 hover:bg-white/5 rounded-xl text-slate-500 hover:text-white transition-all border border-transparent hover:border-white/10"
                                     >
-                                        İptal
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] ml-1">Hedef Ürün</label>
+                                        <select
+                                            value={optionData.productId}
+                                            onChange={(e) => setOptionData({ ...optionData, productId: e.target.value })}
+                                            className="w-full bg-slate-950 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 transition-all cursor-pointer"
+                                        >
+                                            <option value="">Ürün Seçiniz...</option>
+                                            {localProducts.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] ml-1">Seçenek İsmi</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ör: Ekstra Shot"
+                                            value={optionData.name}
+                                            onChange={(e) => setOptionData({ ...optionData, name: e.target.value })}
+                                            className="w-full bg-slate-950 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 transition-all placeholder:text-slate-700"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] ml-1">Fiyat Farkı (₺)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-bold">₺</span>
+                                            <input
+                                                type="number"
+                                                placeholder="0"
+                                                value={optionData.priceDiff}
+                                                onChange={(e) => setOptionData({ ...optionData, priceDiff: e.target.value })}
+                                                className="w-full bg-slate-950 border border-white/5 rounded-2xl pl-10 pr-4 py-4 text-white outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
+                                                step="0.01"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 pt-4">
+                                    <button
+                                        onClick={() => setIsOptionModalOpen(false)}
+                                        className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-[1.25rem] font-bold transition-all border border-white/5"
+                                    >
+                                        Vazgeç
                                     </button>
                                     <button
                                         onClick={handleAddOption}
                                         disabled={saving}
-                                        className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-bold shadow-lg shadow-purple-900/30 flex justify-center items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-violet-700 hover:from-indigo-500 hover:to-violet-600 text-white rounded-[1.25rem] font-bold shadow-xl shadow-indigo-500/10 flex justify-center items-center gap-3 transition-all disabled:opacity-50"
                                     >
-                                        {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                        {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
                                         Kaydet
                                     </button>
                                 </div>
@@ -412,56 +424,52 @@ const Products: React.FC = () => {
 
                 {/* Add Product Form */}
                 {isFormOpen && canEdit && (
-                    <div className="relative bg-gradient-to-br from-slate-800/40 via-slate-800/30 to-slate-900/40 backdrop-blur-sm p-6 rounded-3xl border border-indigo-500/20 shadow-2xl shadow-indigo-500/5 animate-in fade-in slide-in-from-top-4 duration-300">
-                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-3xl" />
-
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-xl">
-                                    <Sparkles className="text-white" size={20} />
+                    <div className="relative group/form">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-[2.5rem] blur opacity-10 group-hover/form:opacity-20 transition duration-1000"></div>
+                        <div className="relative bg-slate-900/40 backdrop-blur-md border border-white/5 p-8 rounded-[2.5rem] shadow-2xl animate-in slide-in-from-top-4 duration-500">
+                            <div className="flex items-center gap-4 mb-8">
+                                <div className="bg-indigo-500/10 p-2.5 rounded-2xl border border-indigo-500/20">
+                                    <Sparkles className="text-indigo-400" size={24} />
                                 </div>
-                                <h3 className="font-bold text-white text-lg">Yeni Ürün Bilgileri</h3>
+                                <div>
+                                    <h3 className="font-bold text-white text-xl tracking-tight">Yeni Ürün Ekle</h3>
+                                    <p className="text-slate-500 text-xs mt-0.5">Lütfen ürün detaylarını giriniz</p>
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                <div className="md:col-span-4">
-                                    <label className="text-xs text-slate-400 ml-1 mb-2 block font-bold uppercase tracking-wider">
-                                        Ürün Adı <span className="text-red-400">*</span>
-                                    </label>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                                <div className="md:col-span-4 space-y-2">
+                                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] ml-1">Ürün İsmi</label>
                                     <input
                                         type="text"
-                                        placeholder="Ör: Iced Latte"
+                                        placeholder="Ör: Iced Americano"
                                         value={newProduct.name}
                                         onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                                        className="w-full bg-slate-900/50 border border-slate-600/50 rounded-xl px-4 py-3.5 text-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-600"
+                                        className="w-full bg-slate-950/50 border border-white/5 rounded-2xl px-5 py-4 text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-700"
                                     />
                                 </div>
 
-                                <div className="md:col-span-3">
-                                    <label className="text-xs text-slate-400 ml-1 mb-2 block font-bold uppercase tracking-wider">
-                                        Kategori
-                                    </label>
+                                <div className="md:col-span-3 space-y-2">
+                                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] ml-1">Kategori</label>
                                     <select
                                         value={newProduct.category}
                                         onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                                        className="w-full bg-slate-900/50 border border-slate-600/50 rounded-xl px-4 py-3.5 text-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                        className="w-full bg-slate-950/50 border border-white/5 rounded-2xl px-5 py-4 text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer"
                                     >
                                         {activeCats.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                                     </select>
                                 </div>
 
-                                <div className="md:col-span-3">
-                                    <label className="text-xs text-slate-400 ml-1 mb-2 block font-bold uppercase tracking-wider">
-                                        Satış Fiyatı <span className="text-red-400">*</span>
-                                    </label>
+                                <div className="md:col-span-3 space-y-2">
+                                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] ml-1">Satış Fiyatı</label>
                                     <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-lg">₺</span>
+                                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold">₺</span>
                                         <input
                                             type="number"
                                             placeholder="0.00"
                                             value={newProduct.price}
                                             onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                                            className="w-full bg-slate-900/50 border border-slate-600/50 rounded-xl pl-9 pr-4 py-3.5 text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all font-mono font-bold"
+                                            className="w-full bg-slate-950/50 border border-white/5 rounded-2xl pl-12 pr-5 py-4 text-white outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono font-bold"
                                             step="0.01"
                                         />
                                     </div>
@@ -471,13 +479,13 @@ const Products: React.FC = () => {
                                     <button
                                         onClick={handleAddProduct}
                                         disabled={saving}
-                                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl shadow-indigo-500/10 active:scale-[0.98] transition-all disabled:opacity-50"
                                     >
                                         {saving ? (
-                                            <Loader2 className="animate-spin" size={18} />
+                                            <Loader2 className="animate-spin" size={20} />
                                         ) : (
                                             <>
-                                                <Save size={18} /> Kaydet
+                                                <Save size={20} /> Kaydet
                                             </>
                                         )}
                                     </button>
@@ -488,28 +496,45 @@ const Products: React.FC = () => {
                 )}
 
                 {/* Search & Filter Section */}
-                <div className="space-y-4 sticky top-0 z-20 bg-gradient-to-b from-slate-950 via-slate-950 to-transparent pt-4 pb-6">
-                    <div className="flex flex-col sm:flex-row gap-4">
+                <div className="space-y-6 sticky top-0 z-20 bg-[#020617]/80 backdrop-blur-xl -mx-4 px-4 py-6">
+                    <div className="flex flex-col lg:flex-row gap-6">
                         {/* Search Bar */}
-                        <div className="relative w-full sm:w-72 shrink-0">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <div className="relative w-full lg:w-96 shrink-0 group">
+                            <div className="absolute inset-0 bg-indigo-500/10 rounded-2xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity" />
+                            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={20} />
                             <input
                                 type="text"
-                                placeholder="Menüde ara..."
+                                placeholder="Ürünlerde veya kategorilerde ara..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl pl-11 pr-4 py-3.5 text-white text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-500"
+                                className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-14 pr-6 py-4 text-white text-sm outline-none focus:border-indigo-500/50 transition-all placeholder:text-slate-600 relative z-10"
                             />
                         </div>
 
+                        {/* Grid View Switcher */}
+                        <div className="flex items-center gap-1 bg-slate-900 border border-white/5 p-1 rounded-2xl w-full lg:w-auto">
+                            {[2, 3, 4].map((num) => (
+                                <button
+                                    key={num}
+                                    onClick={() => setGridCols(num)}
+                                    className={`flex-1 lg:flex-none px-4 py-3 rounded-xl text-xs font-black transition-all ${gridCols === num
+                                        ? 'bg-indigo-600 text-white shadow-lg'
+                                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                                        }`}
+                                >
+                                    {num}'lü
+                                </button>
+                            ))}
+                        </div>
+
                         {/* Category Tabs */}
-                        <div className="flex-1 overflow-x-auto custom-scrollbar pb-2 -mb-2">
-                            <div className="flex gap-2 min-w-max">
+                        <div className="flex-1 overflow-x-auto custom-scrollbar-hide pb-2">
+                            <div className="flex gap-3 min-w-max pr-4">
                                 <button
                                     onClick={() => setActiveCategory('Tümü')}
-                                    className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 ${activeCategory === 'Tümü'
-                                        ? 'bg-white text-slate-900 shadow-lg'
-                                        : 'bg-slate-800/50 backdrop-blur-sm text-slate-400 hover:bg-slate-700/50 hover:text-white border border-slate-700/50'
+                                    className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-[0.15em] transition-all duration-300 border ${activeCategory === 'Tümü'
+                                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                                        : 'bg-slate-900/40 border-white/5 text-slate-500 hover:text-slate-300 hover:border-white/10'
                                         }`}
                                 >
                                     Tümü
@@ -518,12 +543,14 @@ const Products: React.FC = () => {
                                     <button
                                         key={cat.id}
                                         onClick={() => setActiveCategory(cat.name)}
-                                        className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap flex items-center gap-2.5 transition-all duration-200 ${activeCategory === cat.name
-                                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-900/30 scale-105'
-                                            : 'bg-slate-800/50 backdrop-blur-sm text-slate-400 hover:bg-slate-700/50 hover:text-white border border-slate-700/50'
+                                        className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-[0.15em] flex items-center gap-3 transition-all duration-300 border ${activeCategory === cat.name
+                                            ? 'bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20'
+                                            : 'bg-slate-900/40 border-white/5 text-slate-500 hover:text-slate-300 hover:border-white/10'
                                             }`}
                                     >
-                                        {getCategoryIcon(cat.name)}
+                                        <span className={activeCategory === cat.name ? 'text-white' : 'text-slate-600'}>
+                                            {getCategoryIcon(cat.name)}
+                                        </span>
                                         {cat.name}
                                     </button>
                                 ))}
@@ -535,7 +562,12 @@ const Products: React.FC = () => {
                 {/* Products Grid */}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                     <SortableContext items={filteredAndSortedProducts} strategy={rectSortingStrategy}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                        <div className={`grid gap-4 md:gap-8 ${gridCols === 2
+                                ? 'grid-cols-2'
+                                : gridCols === 3
+                                    ? 'grid-cols-2 md:grid-cols-3'
+                                    : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                            }`}>
                             {filteredAndSortedProducts.map((product) => (
                                 <SortableProductItem
                                     key={product.id}

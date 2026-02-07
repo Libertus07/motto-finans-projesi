@@ -869,7 +869,7 @@ const AccountView: React.FC<AccountViewProps> = ({ customerProfile, onSignOut, t
                     {/* Tier Benefits Section */}
                     {customerProfile && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-50">
-                            <h3 className="px-4 mb-3 text-[10px] font-black text-[#432818]/40 uppercase tracking-[0.2em]">Sadakat Programı</h3>
+                            <h3 className="px-4 mb-3 text-[10px] font-black text-[#432818]/40 uppercase tracking-[0.2em]">Motto Club Ayrıcalıkları</h3>
                             <div className="bg-white rounded-[2rem] shadow-sm border border-[#432818]/5 overflow-hidden">
                                 <button
                                     onClick={() => setShowTierModal(true)}

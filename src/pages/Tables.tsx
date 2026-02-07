@@ -291,11 +291,11 @@ const Tables: React.FC = () => {
 
     const { hasPermission } = usePermissions();
 
-    const handleRemoveOrder = async (tableId: string, orderId: string, price: number) => {
+    const handleRemoveOrder = async (tableId: string, orderId: string, price: number, removeAll: boolean = false) => {
         if (!hasPermission(PERMISSIONS.ORDER_DELETE)) {
             return toast.error("Ürün silme yetkiniz yok!", { icon: '🔒' });
         }
-        if (processing) return; setProcessing(true); const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', tableId); try { const currentTable = tables.find(t => t.id === tableId); if (!currentTable) return; const existingOrderIndex = currentTable.orders.findIndex(o => o.id === orderId); if (existingOrderIndex === -1) return; const newOrders = [...currentTable.orders]; const newTotal = currentTable.total - price; if (newOrders[existingOrderIndex].quantity > 1) { newOrders[existingOrderIndex].quantity -= 1; } else { newOrders.splice(existingOrderIndex, 1); } const newStatus = newOrders.length === 0 ? 'empty' : currentTable.status; const updateData: any = { orders: newOrders, total: newTotal, status: newStatus }; if (newStatus === 'empty') { updateData.startTime = null; updateData.lastOrderTime = null; } await updateDoc(tableRef, updateData); } catch (error) { console.error(error); toast.error("Silinemedi"); } finally { setProcessing(false); }
+        if (processing) return; setProcessing(true); const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', tableId); try { const currentTable = tables.find(t => t.id === tableId); if (!currentTable) return; const existingOrderIndex = currentTable.orders.findIndex(o => o.id === orderId); if (existingOrderIndex === -1) return; const newOrders = [...currentTable.orders]; const newTotal = currentTable.total - price; if (newOrders[existingOrderIndex].quantity > 1 && !removeAll) { newOrders[existingOrderIndex].quantity -= 1; } else { newOrders.splice(existingOrderIndex, 1); } const newStatus = newOrders.length === 0 ? 'empty' : currentTable.status; const updateData: any = { orders: newOrders, total: newTotal, status: newStatus }; if (newStatus === 'empty') { updateData.startTime = null; updateData.lastOrderTime = null; } await updateDoc(tableRef, updateData); } catch (error) { console.error(error); toast.error("Silinemedi"); } finally { setProcessing(false); }
     };
 
     const confirmMarkAsEmpty = async () => {
@@ -307,21 +307,34 @@ const Tables: React.FC = () => {
 
     const confirmCloseTable = async () => {
         if (!selectedTable) return;
+        handleDeferCloseTable({
+            total: selectedTable.total,
+            discount: 0,
+            method: paymentMethod,
+            bank: cardBank
+        });
+    };
+
+    const handleDeferCloseTable = async (data: { total: number; discount: number; method: string; bank: string }) => {
+        if (!selectedTable) return;
         setProcessing(true);
         try {
-            const transMethod = paymentMethod === 'cash' ? 'cash' : 'card';
-            const transCardBank = paymentMethod === 'card' ? cardBank : null;
-            const subMethodDisplay = paymentMethod === 'cash' ? 'Nakit' : `Kart (${cardBank.toUpperCase()})`;
+            const transMethod = data.method;
+            const transCardBank = data.method === 'card' ? data.bank : null;
+            const subMethodDisplay = data.method === 'cash' ? 'Nakit' : `Kart (${data.bank.toUpperCase()})`;
+
             await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), {
                 date: new Date().toISOString().split('T')[0],
                 type: 'income',
-                amount: selectedTable.total,
+                amount: data.total, // İndirimli Tutar
+                discount: data.discount, // İndirim Tutarı
                 desc: `${selectedTable.name} (${selectedTable.zone}) Satışı`,
                 method: transMethod,
                 cardBank: transCardBank,
                 category: 'Masa Satışı',
                 subMethod: subMethodDisplay
             });
+
             const productUpdates = selectedTable.orders.map(async (order) => {
                 const productRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'products', order.productId);
                 await updateDoc(productRef, {
@@ -340,18 +353,57 @@ const Tables: React.FC = () => {
             await updateDoc(doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id), {
                 orders: [],
                 total: 0,
+                paid: 0, // Reset paid amount
                 status: 'needs_cleaning',
                 startTime: null,
                 lastOrderTime: null
             });
+
             setIsCloseModalOpen(false);
             setSelectedTable(null);
-            setPaymentMethod('cash');
-            setCardBank('ziraat');
-            toast.success("Hesap kapatıldı");
+            toast.success(`Hesap Kapatıldı (${data.total.toFixed(2)} ₺)`, { icon: '✅' });
         } catch (error) {
             console.error(error);
             toast.error("Hata oluştu");
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handlePartialPayment = async (amount: number, method: string, bank: string) => {
+        if (!selectedTable) return;
+        setProcessing(true);
+        try {
+            const transMethod = method;
+            const transCardBank = method === 'card' ? bank : null;
+            const subMethodDisplay = method === 'cash' ? 'Nakit' : `Kart (${bank.toUpperCase()})`;
+
+            // 1. Transaction Log
+            await addDoc(collection(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'transactions'), {
+                date: new Date().toISOString().split('T')[0],
+                type: 'income',
+                amount: amount,
+                desc: `${selectedTable.name} Parçalı Ödeme`,
+                method: transMethod,
+                cardBank: transCardBank,
+                category: 'Masa Satışı',
+                subMethod: subMethodDisplay
+            });
+
+            // 2. Update Table "paid" field
+            const newPaid = (selectedTable.paid || 0) + amount;
+            const tableRef = doc(db, 'artifacts', appId, 'shops', CURRENT_SHOP_ID, 'tables', selectedTable.id);
+            await updateDoc(tableRef, {
+                paid: newPaid
+            });
+
+            // 3. Update Local State
+            setSelectedTable(prev => prev ? ({ ...prev, paid: newPaid }) : null);
+
+            toast.success(`Parçalı Tahsilat: ${amount} ₺`, { icon: '💸' });
+        } catch (error) {
+            console.error(error);
+            toast.error("İşlem Başarısız");
         } finally {
             setProcessing(false);
         }
@@ -474,10 +526,10 @@ const Tables: React.FC = () => {
                     processedProducts={processedProducts}
                     handleProductClick={handleProductClick}
                     handleRemoveOrder={handleRemoveOrder}
-                    paymentMethod={paymentMethod}
-                    setPaymentMethod={setPaymentMethod}
-                    cardBank={cardBank}
-                    setCardBank={setCardBank}
+                    paymentMethod={'cash'} // Managed internally now
+                    setPaymentMethod={() => { }} // Managed internally now
+                    cardBank={'ziraat'} // Managed internally now
+                    setCardBank={() => { }} // Managed internally now
                     bankOptions={bankOptions}
                     handlePrintBill={handlePrintBill}
                     setIsCloseModalOpen={setIsCloseModalOpen}
@@ -495,6 +547,8 @@ const Tables: React.FC = () => {
                         setSelectedTable(prev => prev ? ({ ...prev, isVIP: newStatus }) : null);
                         toast.success(newStatus ? "Masa VIP olarak işaretlendi" : "VIP statüsü kaldırıldı", { icon: '✨' });
                     }}
+                    onDeferCloseTable={handleDeferCloseTable}
+                    onPartialPayment={handlePartialPayment}
                 />
             )
             }

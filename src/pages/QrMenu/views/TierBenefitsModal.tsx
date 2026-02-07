@@ -37,7 +37,7 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose, 
                         </div>
                         <div>
                             <h2 className="text-xl font-black text-[#FDFBF7] font-cinzel tracking-tight leading-none">Ayrıcalıklar</h2>
-                            <p className="text-[#FDFBF7]/60 text-[10px] font-bold uppercase tracking-widest">Sadakat Durumu</p>
+                            <p className="text-[#FDFBF7]/60 text-[10px] font-bold uppercase tracking-widest">Motto Club Statüsü</p>
                         </div>
                     </div>
                     <button

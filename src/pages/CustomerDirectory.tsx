@@ -100,7 +100,7 @@ const CustomerDirectory: React.FC = () => {
         return [
             { label: 'Toplam Üye', value: total, icon: Users, color: 'indigo' },
             { label: 'VIP Müşteriler', value: vips, icon: Award, color: 'amber' },
-            { label: 'Dağıtılan M-Coin', value: totalPoints, icon: Coins, color: 'purple' },
+            { label: 'Dağıtılan Volt', value: totalPoints, icon: Zap, color: 'purple' },
             { label: 'Puan Ortalaması', value: avgPoints, icon: TrendingUp, color: 'emerald' }
         ];
     }, [customers]);
@@ -194,7 +194,7 @@ const CustomerDirectory: React.FC = () => {
                                     <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Müşteri</th>
                                     <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Telefon</th>
                                     <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Seviye</th>
-                                    <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">M-Coin</th>
+                                    <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Volt</th>
                                     <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Kayıt</th>
                                 </tr>
                             )}
@@ -268,11 +268,11 @@ const CustomerDirectory: React.FC = () => {
                             {/* 💰 PUAN VE TL KARTI */}
                             <div className="p-6 rounded-[32px] bg-indigo-600 text-white mb-8 shadow-lg shadow-indigo-600/20 flex justify-between items-center relative overflow-hidden">
                                 <div className="relative z-10">
-                                    <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest mb-1">M-COIN BAKİYESİ</p>
-                                    <h5 className="text-3xl font-black">{selectedCustomer.points || 0} P</h5>
+                                    <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest mb-1">VOLT BAKİYESİ</p>
+                                    <h5 className="text-3xl font-black">{selectedCustomer.points || 0} Volt</h5>
                                     <p className="text-xs font-bold opacity-90 mt-1">≈ {((selectedCustomer.points || 0) / 10).toFixed(2)} ₺ Değerinde</p>
                                 </div>
-                                <Coins size={48} className="absolute right-[-10px] bottom-[-10px] opacity-20 rotate-12" />
+                                <Zap size={48} className="absolute right-[-10px] bottom-[-10px] opacity-20 rotate-12" />
                             </div>
 
                             {/* 🕒 SİPARİŞ GEÇMİŞİ */}

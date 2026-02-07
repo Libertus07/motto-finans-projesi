@@ -142,6 +142,7 @@ export interface Table {
     status: TableStatus;
     orders: OrderItem[];
     total: Price;
+    paid?: number; // Store partial payments persistence
 
     // Ownership & Timing
     staffId?: ID | null;

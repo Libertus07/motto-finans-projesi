@@ -120,77 +120,6 @@ export default function useDashboardCalculations(
         return products?.filter(p => (p.stock || 0) <= (p.minStock || 5)).length || 0;
     }, [products]);
 
-    // Top Loyalty Product calculation
-    const topLoyaltyProduct = useMemo(() => {
-        const productStats: Record<string, number> = {};
-
-        // 1. Tüm işlemlerdeki ürünleri tara
-        transactions.forEach(t => {
-            if (t.type === 'income' && t.items) {
-                t.items.forEach((item) => {
-                    const pointsEarned = Math.floor((item.price * item.quantity) * 2); // 1 TL = 2 puan
-                    productStats[item.name] = (productStats[item.name] || 0) + pointsEarned;
-                });
-            }
-        });
-
-        // 2. En yüksek puan kazandıranı bul
-        const topName = Object.keys(productStats).reduce((a, b) =>
-            productStats[a] > productStats[b] ? a : b, '');
-
-        if (!topName) return null;
-
-        return {
-            name: topName,
-            totalPoints: productStats[topName]
-        };
-    }, [transactions]);
-
-    // Loyalty Analytics
-    const loyaltyAnalytics = useMemo(() => {
-        const now = new Date();
-        const currentMonth = now.toISOString().slice(0, 7);
-        const lastMonthDate = new Date(now.setMonth(now.getMonth() - 1));
-        const lastMonth = lastMonthDate.toISOString().slice(0, 7);
-
-        // 1. Puan Dağılımı ve Kullanımı
-        let totalPointsDistributed = 0;
-        let totalPointsRedeemed = 0;
-
-        transactions.forEach(t => {
-            const points = Math.floor(Number(t.amount || 0) * 2); // 1 TL = 2 puan
-            if (t.type === 'income') totalPointsDistributed += points;
-            if (t.type === 'redeem') totalPointsRedeemed += (t.pointsSpent || 0);
-        });
-
-        // 2. Üye Artış Hızı (Gerçek Kıyaslama)
-        const currentMonthMembers = customers.filter(c => c.createdAt?.startsWith(currentMonth)).length;
-        const lastMonthMembers = customers.filter(c => c.createdAt?.startsWith(lastMonth)).length;
-
-        const growthRate = lastMonthMembers > 0
-            ? ((currentMonthMembers - lastMonthMembers) / lastMonthMembers) * 100
-            : (currentMonthMembers > 0 ? 100 : 0);
-
-        // 3. Puan Kullanım Oranı
-        const redemptionRate = totalPointsDistributed > 0
-            ? (totalPointsRedeemed / totalPointsDistributed) * 100
-            : 0;
-
-        return {
-            growthRate: growthRate.toFixed(1),
-            redemptionRate: redemptionRate.toFixed(1),
-            totalPointsDistributed
-        };
-    }, [transactions, customers]);
-
-    // Top Loyalty Product with Share
-    const topLoyaltyProductReal = useMemo(() => {
-        const share = loyaltyAnalytics.totalPointsDistributed > 0 && topLoyaltyProduct
-            ? (topLoyaltyProduct.totalPoints / loyaltyAnalytics.totalPointsDistributed) * 100
-            : 0;
-        return { ...topLoyaltyProduct, share: share.toFixed(1) };
-    }, [topLoyaltyProduct, loyaltyAnalytics]);
-
     // Financial Calculations
     const currentMonthExpenses = transactions.filter(t => t.date.startsWith(currentMonthPrefix) && t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
     const currentNetProfit = safeMonthlyIncome - currentMonthExpenses;
@@ -346,9 +275,6 @@ export default function useDashboardCalculations(
 
         // Star and top calculations
         starOfTheDay, topSpender, criticalStockCount,
-
-        // Loyalty analytics
-        topLoyaltyProduct, loyaltyAnalytics, topLoyaltyProductReal,
 
         // Financial metrics
         safeMonthlyIncome, currentMonthExpenses, currentNetProfit, profitMargin,
