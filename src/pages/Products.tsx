@@ -32,7 +32,7 @@ const Products: React.FC = () => {
     const activeCats = categories && categories.length > 0 ? categories : [{ id: 'def', name: 'Tümü' }];
 
     const [localProducts, setLocalProducts] = useState<Product[]>([]);
-    const [newProduct, setNewProduct] = useState<{ name: string; price: string; category: string }>({ name: '', price: '', category: '' });
+    const [newProduct, setNewProduct] = useState<{ name: string; price: string; category: string; image: string }>({ name: '', price: '', category: '', image: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('Tümü');
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -128,11 +128,12 @@ const Products: React.FC = () => {
                 name: newProduct.name,
                 price: Number(newProduct.price),
                 category: newProduct.category || activeCats[0]?.name,
+                image: newProduct.image || '',
                 sold: 0,
                 options: [],
                 order: maxOrder + 1
             });
-            setNewProduct({ name: '', price: '', category: activeCats[0]?.name || '' });
+            setNewProduct({ name: '', price: '', category: activeCats[0]?.name || '', image: '' });
             setIsFormOpen(false);
             setToast('Ürün eklendi');
         } catch (error) {
@@ -475,7 +476,18 @@ const Products: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="md:col-span-2">
+                                <div className="md:col-span-12 space-y-2 mt-4">
+                                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] ml-1">Görsel (Image URL)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="https://... (İsteğe bağlı)"
+                                        value={newProduct.image}
+                                        onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
+                                        className="w-full bg-slate-950/50 border border-white/5 rounded-2xl px-5 py-4 text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-700"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-12 mt-4">
                                     <button
                                         onClick={handleAddProduct}
                                         disabled={saving}

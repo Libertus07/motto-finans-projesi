@@ -116,6 +116,17 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({
                             </h4>
                         )}
                     </div>
+                    {canEdit && (
+                        <div className="px-2 mt-2">
+                            <input
+                                type="text"
+                                value={product.image || ''}
+                                onChange={(e) => handleUpdateProduct(product.id, 'image', e.target.value)}
+                                className="bg-slate-950/50 w-full text-slate-400 text-xs outline-none border border-white/5 focus:border-indigo-500/30 transition-all placeholder:text-slate-700 text-center py-2 px-3 rounded-xl"
+                                placeholder="Görsel URL (İsteğe bağlı)"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* Centered Options */}

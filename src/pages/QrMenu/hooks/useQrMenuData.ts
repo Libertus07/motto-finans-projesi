@@ -146,22 +146,47 @@ export const useQrMenuData = () => {
         }
     }, [customerProfile, tableId, tableInfo?.isVIP]);
 
-    // 🖼️ CATEGORY IMAGES
+    // 🖼️ CATEGORY IMAGES & MANAGED CATEGORIES
+    const [managedCategories, setManagedCategories] = useState<{ id: string; name: string; image?: string }[]>([]);
     const [categoryImages, setCategoryImages] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        const unsubImages = onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'categories'), (snapshot) => {
-            const images: Record<string, string> = {};
-            snapshot.docs.forEach(doc => {
-                images[doc.id] = doc.data().image;
-            });
-            setCategoryImages(images);
+        const unsubSettings = onSnapshot(doc(db, 'artifacts', appId, 'shops', SHOP_ID, 'settings', 'categories'), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const list = data.list || [];
+                setManagedCategories(list);
+
+                const images: Record<string, string> = {};
+                list.forEach((cat: any) => {
+                    if (cat.name && cat.image) {
+                        images[cat.name] = cat.image;
+                    }
+                });
+                setCategoryImages(images);
+            }
         });
-        return () => unsubImages();
+        return () => unsubSettings();
     }, []);
 
     // Derived State
-    const categories = useMemo(() => [...new Set(products.map(item => item.category))], [products]);
+    const categories = useMemo(() => {
+        const productCats = new Set(products.map(item => item.category));
+        const result: string[] = [];
+        
+        // Yönetici panelinden gelen sıralamayı baz al (ama sadece içinde ürün olanları göster)
+        managedCategories.forEach(cat => {
+            if (productCats.has(cat.name)) {
+                result.push(cat.name);
+                productCats.delete(cat.name);
+            }
+        });
+        
+        // Eğer yönetici panelinde silinmiş ama hala içinde ürün olan kategori varsa en sona ekle
+        Array.from(productCats).forEach(cat => result.push(cat));
+        
+        return result;
+    }, [products, managedCategories]);
     const favoriteProducts = useMemo(() => products.filter(p => p.isFavorite).slice(0, 4), [products]);
     const productsByCategory = useMemo(() => {
         const grouped: Record<string, Product[]> = {};

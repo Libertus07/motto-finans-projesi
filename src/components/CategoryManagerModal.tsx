@@ -11,15 +11,17 @@ import { SHOP_ID as CURRENT_SHOP_ID } from '../utils/constants';
 interface Category {
     id: string;
     name: string;
+    image?: string;
 }
 
 interface SortableCategoryItemProps {
     category: Category;
     onDelete: (id: string) => void;
+    onUpdate: (id: string, image: string) => void;
 }
 
 // Sürüklenebilir Liste Elemanı
-const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onDelete }) => {
+const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onDelete, onUpdate }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: category.id });
 
     const style = {
@@ -30,20 +32,31 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     };
 
     return (
-        <div ref={setNodeRef} style={style} className={`flex items-center gap-3 p-3 bg-slate-800 rounded-xl border ${isDragging ? 'border-indigo-500 shadow-xl' : 'border-slate-700'} group relative`}>
-            <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-white p-1">
-                <GripVertical size={20} />
-            </div>
-            <span className="flex-1 font-bold text-white text-sm">{category.name}</span>
+        <div ref={setNodeRef} style={style} className={`flex flex-col gap-2 p-3 bg-slate-800 rounded-xl border ${isDragging ? 'border-indigo-500 shadow-xl' : 'border-slate-700'} group relative`}>
+            <div className="flex items-center gap-3">
+                <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-white p-1">
+                    <GripVertical size={20} />
+                </div>
+                <span className="flex-1 font-bold text-white text-sm">{category.name}</span>
 
-            {/* Silme Butonu (Onaysız, direkt siler) */}
-            <button
-                onClick={() => onDelete(category.id)}
-                className="p-2 text-slate-500 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
-                title="Kategoriyi Sil"
-            >
-                <Trash2 size={16} />
-            </button>
+                {/* Silme Butonu (Onaysız, direkt siler) */}
+                <button
+                    onClick={() => onDelete(category.id)}
+                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
+                    title="Kategoriyi Sil"
+                >
+                    <Trash2 size={16} />
+                </button>
+            </div>
+            <div className="pl-10 pr-2">
+                <input
+                    type="text"
+                    placeholder="Görsel URL (İsteğe bağlı)"
+                    value={category.image || ''}
+                    onChange={(e) => onUpdate(category.id, e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 outline-none focus:border-indigo-500 transition-colors"
+                />
+            </div>
         </div>
     );
 };
@@ -131,6 +144,12 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
         setToast('Kategori silindi');
     };
 
+    const handleUpdateImage = (id: string, imageUrl: string) => {
+        const newList = categories.map(c => c.id === id ? { ...c, image: imageUrl } : c);
+        setCategories(newList);
+        saveToFirebase(newList);
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -151,7 +170,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
                         <SortableContext items={categories} strategy={verticalListSortingStrategy}>
                             <div className="space-y-2">
                                 {categories.map((cat) => (
-                                    <SortableCategoryItem key={cat.id} category={cat} onDelete={handleDelete} />
+                                    <SortableCategoryItem key={cat.id} category={cat} onDelete={handleDelete} onUpdate={handleUpdateImage} />
                                 ))}
                             </div>
                         </SortableContext>

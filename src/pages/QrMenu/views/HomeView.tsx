@@ -3,12 +3,6 @@ import { Plus, Clock, Leaf, Flame, Wheat, User, Bell } from 'lucide-react';
 import { Product } from '../../../types';
 import { CustomerProfile } from './qrMenu';
 import { getTodayString } from '../../../utils/helpers';
-import VoltWidget from '../components/VoltWidget';
-import StampCard from '../components/StampCard';
-import LiveTrends from '../components/LiveTrends';
-import JukeboxWidget from '../components/JukeboxWidget';
-import GuestbookWidget from '../components/GuestbookWidget';
-import MottoGameWidget from '../components/MottoGameWidget';
 import { ChevronLeft, LayoutGrid, Lock } from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
 import CoffeeLoader from '../components/CoffeeLoader';
@@ -41,15 +35,8 @@ interface HomeViewProps {
     categories: string[];
     activeCategory: string | null;
     productsByCategory: Record<string, Product[]>;
-    isMember: boolean;
-    customerProfile: CustomerProfile | null;
     onCategoryClick: (category: string) => void;
     onProductClick: (product: Product) => void;
-    onWheelClick: () => void;
-    onOracleClick: () => void;
-    onScratchClick: () => void;
-    onAuthClick: () => void;
-    onAccountClick: () => void;
     onResetCategory: () => void;
     t: (key: string) => string;
     categoryImages?: Record<string, string>;
@@ -61,15 +48,8 @@ const HomeView: React.FC<HomeViewProps> = ({
     categories,
     activeCategory,
     productsByCategory,
-    isMember,
-    customerProfile,
     onCategoryClick,
     onProductClick,
-    onWheelClick,
-    onOracleClick,
-    onScratchClick,
-    onAuthClick,
-    onAccountClick,
     onResetCategory,
     t,
     categoryImages = {}
@@ -105,10 +85,6 @@ const HomeView: React.FC<HomeViewProps> = ({
             )}
         </div>
     );
-
-    // Yönetici Kontrolü ve Çark Durumu
-    const isUserAdmin = customerProfile?.role === 'admin' || customerProfile?.isAdmin === true;
-    const isWheelDisabled = isMember && customerProfile?.lastSpinDate === getTodayString() && !isUserAdmin;
 
     if (loading) return <SkeletonLoader />;
 
@@ -157,21 +133,8 @@ const HomeView: React.FC<HomeViewProps> = ({
                             </button>
                         </div>
 
-                        {/* Right: Action Buttons */}
                         <div className="flex items-center gap-3 z-20">
-
-
-                            <button
-                                onClick={isMember ? onAccountClick : onAuthClick}
-                                className={`w-11 h-11 rounded-[1.2rem] flex items-center justify-center font-black text-sm shadow-md overflow-hidden relative active:scale-90 transition-transform ${isMember ? 'bg-gradient-to-br from-[#432818] to-[#2a1810] ring-2 ring-[#D4AF37] text-[#FDFBF7]' : 'bg-white text-[#432818] ring-1 ring-[#432818]/5'}`}
-                            >
-                                {isMember ? (
-                                    <span className="font-cinzel text-lg">{customerProfile?.firstName?.charAt(0)}</span>
-                                ) : (
-                                    <User size={20} className="opacity-80" />
-                                )}
-                                {isMember && <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.4)_0%,transparent_60%)]"></div>}
-                            </button>
+                            {/* Removed auth/account button from header */}
                         </div>
                     </div>
                 </div>
@@ -198,18 +161,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                 {!activeCategory ? (
                     <>
                         <div className="px-5 space-y-4 mt-6">
-                            {/* Top row: Side-by-side */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <VoltWidget customerProfile={customerProfile} isMember={isMember} onOpenAuth={onAuthClick} />
-                                <MottoGameWidget
-                                    onWheelClick={onWheelClick}
-                                    onOracleClick={onOracleClick}
-                                    onScratchClick={onScratchClick}
-                                />
-                            </div>
-
-                            {/* Bottom row: Full width horizontal */}
-                            <StampCard isMember={isMember} customerProfile={customerProfile} onOpenAuth={onAuthClick} />
+                            {/* Widgets removed as requested */}
                         </div>
 
                         {/* --- CATEGORY GRID --- */}
@@ -297,7 +249,15 @@ const HomeView: React.FC<HomeViewProps> = ({
                                 >
                                     {renderDietLabels(item)}
                                     <div className="w-28 h-28 bg-[#F9F7F5] rounded-[2rem] flex items-center justify-center text-5xl shrink-0 relative group-hover:scale-105 transition-transform duration-500 overflow-hidden shadow-inner ring-1 ring-[#432818]/5">
-                                        {item.image || '☕'}
+                                        {item.image ? (
+                                            item.image.startsWith('http') ? (
+                                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                item.image
+                                            )
+                                        ) : (
+                                            '☕'
+                                        )}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-white/20 via-transparent to-transparent"></div>
                                         {item.stock !== undefined && item.stock <= 0 && (
                                             <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20">
@@ -330,32 +290,6 @@ const HomeView: React.FC<HomeViewProps> = ({
                         </div>
                     </div>
                 )}
-            </div>
-
-            {/* --- EXPERIENCE SECTIONS (Navigated from HUB) --- */}
-            <div className="mt-20 space-y-8 pb-10 relative">
-                {/* LOCKED OVERLAY */}
-                <div className="absolute inset-0 z-20 backdrop-blur-sm bg-[#FDFBF7]/60 flex flex-col items-center justify-center text-center p-6 rounded-3xl border border-[#432818]/5">
-                    <div className="w-16 h-16 bg-[#432818] rounded-2xl flex items-center justify-center shadow-2xl shadow-[#432818]/20 mb-4 ring-4 ring-[#FDFBF7]">
-                        <Lock size={32} className="text-[#D4AF37]" />
-                    </div>
-                    <h3 className="font-black text-2xl text-[#432818] font-cinzel mb-2">YAKINDA</h3>
-                    <p className="text-[#432818]/60 font-medium max-w-xs leading-relaxed">
-                        Motto Club deneyim alanı çok yakında sizlerle buluşacak. Yeni özellikler için takipte kalın!
-                    </p>
-                </div>
-
-                <div className="opacity-40 grayscale pointer-events-none select-none filter blur-[2px]">
-                    <div id="live-trends">
-                        <LiveTrends />
-                    </div>
-                    <div id="jukebox-widget">
-                        <JukeboxWidget />
-                    </div>
-                    <div id="guestbook-widget">
-                        <GuestbookWidget />
-                    </div>
-                </div>
             </div>
 
             <div className="flex flex-col items-center justify-center py-12 opacity-30 mix-blend-multiply">

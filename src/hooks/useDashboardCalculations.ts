@@ -209,6 +209,67 @@ export default function useDashboardCalculations(
     const estimatedStockValue = ingredients.reduce((sum, ing) => sum + ((ing.cost || 0) * (ing.stock || 0)), 0);
     const stockStatus = "Optimal";
 
+    // ========================================================================
+    // 2. YENİ NESİL AKILLI VERİLER (AI & RADAR & FEED)
+    // ========================================================================
+
+    // 2.1 Motto AI Insights
+    const aiInsights = useMemo(() => {
+        const insights = [];
+
+        // Ciro Analizi
+        if (isDailyGrowing) {
+            insights.push({ icon: 'TrendingUp', text: `Cironuz düne göre %${percentChange.toFixed(1)} artışta, yükseliş trendi devam ediyor.`, type: 'success' as const, path: '/pos/stats' });
+        } else if (percentChange < -20) {
+            insights.push({ icon: 'TrendingDown', text: "Ciroda belirgin düşüş var, kampanya planlamayı düşünebilirsiniz.", type: 'warning' as const, path: '/pos/stats' });
+        }
+
+        // Stok Analizi
+        if (criticalStockCount > 0) {
+            insights.push({ icon: 'Package', text: `${criticalStockCount} ürün kritik seviyede, tedarik zamanı gelmiş olabilir.`, type: 'warning' as const, path: '/pos/inventory' });
+        } else {
+            insights.push({ icon: 'ShieldCheck', text: "Stok seviyeleriniz ideal, operasyonel risk düşük.", type: 'success' as const, path: '/pos/inventory' });
+        }
+
+        // Kârlılık
+        if (profitMargin > 30) {
+            insights.push({ icon: 'Zap', text: "Kâr marjınız sektör ortalamasının üzerinde, verimlilik mükemmel.", type: 'success' as const, path: '/pos/stats' });
+        }
+
+        // Popüler Ürün
+        if (topProductLeader) {
+            insights.push({ icon: 'Award', text: `${topProductLeader.name} bugün ilginin odağında, stoklarını güncel tutun.`, type: 'info' as const, path: '/pos/products' });
+        }
+
+        return insights.length ? insights : [{ icon: 'Info', text: "İşletme verileri analiz ediliyor, her şey yolunda görünüyor.", type: 'info' as const, path: '/pos/assistant' }];
+    }, [isDailyGrowing, percentChange, criticalStockCount, profitMargin, topProductLeader]);
+
+    // 2.2 Performance Radar Data
+    const radarData = useMemo(() => {
+        // Normalize values to 0-100
+        const ciroScore = Math.min((safeMonthlyIncome / 50000) * 100, 100);
+        const profitScore = Math.min(profitMargin * 2, 100); // 50% profit margin = 100 score
+        const customerScore = Math.min((totalMembers / 100) * 100, 100);
+        const stockScore = products.length > 0 ? (1 - (criticalStockCount / products.length)) * 100 : 100;
+        const healthScore = businessHealthScore;
+
+        // Mock Previous Data (Comparison) - In a real app, this would come from historical stats
+        // Simulating a slightly lower previous performance to show growth
+        const prevCiroScore = Math.max(0, ciroScore - (isDailyGrowing ? 10 : -10));
+        const prevProfitScore = Math.max(0, profitScore - 5);
+        const prevCustomerScore = Math.max(0, customerScore - 2);
+        const prevStockScore = Math.max(0, stockScore - 5);
+        const prevHealthScore = Math.max(0, healthScore - 5);
+
+        return [
+            { subject: 'Ciro', A: ciroScore, B: prevCiroScore, value: `${safeMonthlyIncome.toLocaleString('tr-TR')} ₺`, fullMark: 100 },
+            { subject: 'Kârlılık', A: profitScore, B: prevProfitScore, value: `%${profitMargin.toFixed(1)}`, fullMark: 100 },
+            { subject: 'Sadakat', A: customerScore, B: prevCustomerScore, value: `${totalMembers} Üye`, fullMark: 100 },
+            { subject: 'Stok', A: stockScore, B: prevStockScore, value: stockStatus, fullMark: 100 },
+            { subject: 'Sağlık', A: healthScore, B: prevHealthScore, value: `${businessHealthScore}/100`, fullMark: 100 },
+        ];
+    }, [safeMonthlyIncome, profitMargin, totalMembers, criticalStockCount, products.length, businessHealthScore, isDailyGrowing, stockStatus]);
+
     // Occupancy config
     let configIndex = 0;
     if (occupiedTables >= 30) configIndex = 5; else if (occupiedTables >= 20) configIndex = 4; else if (occupiedTables >= 15) configIndex = 3; else if (occupiedTables >= 10) configIndex = 2; else if (occupiedTables >= 5) configIndex = 1;
@@ -304,6 +365,9 @@ export default function useDashboardCalculations(
         turnoverConfig,
 
         // Other stats
-        totalMembers, totalPoints, totalPointsTL, birthdaysToday, estimatedStockValue, stockStatus
+        totalMembers, totalPoints, totalPointsTL, birthdaysToday, estimatedStockValue, stockStatus,
+
+        // New AI & Premium data
+        aiInsights, radarData
     };
 }
