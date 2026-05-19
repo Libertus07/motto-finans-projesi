@@ -27,7 +27,7 @@ import HomeView from './views/HomeView';
 import AccountView from './views/AccountView';
 import SearchView from './views/SearchView';
 import OrdersView from './views/OrdersView';
-
+import ContactView from './views/ContactView';
 // Hooks
 import { useQrMenuData } from './hooks/useQrMenuData';
 
@@ -110,6 +110,10 @@ const QrMenuContent = () => {
                 <SearchView searchQuery={searchQuery} setSearchQuery={setSearchQuery} products={products} onProductClick={setSelectedProduct} />
             )}
 
+            {view === 'contact' && (
+                <ContactView />
+            )}
+
             {view === 'cart' && (
                 <CartView
                     cart={cart}
@@ -128,6 +132,7 @@ const QrMenuContent = () => {
                 setView={setView}
                 cartCount={cart.reduce((a, b) => a + (b.quantity || 1), 0)}
                 onOpenService={() => setIsServiceModalOpen(true)}
+                onCloseService={() => setIsServiceModalOpen(false)}
                 onResetCategory={() => {
                     setActiveCategory(null);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
