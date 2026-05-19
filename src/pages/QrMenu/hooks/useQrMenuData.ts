@@ -6,6 +6,7 @@ import { db, appId, auth } from '../../../services/firebase';
 import { SHOP_ID } from '../../../utils/constants';
 import { Product, CustomerProfile } from '../../../types';
 import { useToast } from '../components/ToastProvider';
+import { MOTTO_MENU_CATEGORIES, MOTTO_MENU_PRODUCTS } from '../data/mottoMenuData';
 
 export const useQrMenuData = () => {
     const { showToast } = useToast();
@@ -105,9 +106,8 @@ export const useQrMenuData = () => {
             presenceInterval = setInterval(updatePresence, 30000);
         }
 
-        const unsubProds = onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'products'), (snap) => {
-            const prodData = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Product[];
-            setProducts(prodData.sort((a, b) => (a.order || 9999) - (b.order || 9999)));
+        const unsubProds = onSnapshot(collection(db, 'artifacts', appId, 'shops', SHOP_ID, 'products'), () => {
+            setProducts([...MOTTO_MENU_PRODUCTS].sort((a, b) => (a.order || 9999) - (b.order || 9999)));
             setLoading(false);
         });
 
@@ -173,18 +173,28 @@ export const useQrMenuData = () => {
     const categories = useMemo(() => {
         const productCats = new Set(products.map(item => item.category));
         const result: string[] = [];
-        
-        // Yönetici panelinden gelen sıralamayı baz al (ama sadece içinde ürün olanları göster)
+
+        // 1) Önce yönetici panelinden gelen sıralamayı kullan
         managedCategories.forEach(cat => {
             if (productCats.has(cat.name)) {
                 result.push(cat.name);
                 productCats.delete(cat.name);
             }
         });
-        
-        // Eğer yönetici panelinde silinmiş ama hala içinde ürün olan kategori varsa en sona ekle
-        Array.from(productCats).forEach(cat => result.push(cat));
-        
+
+        // 2) Yönetici panelinde yoksa Motto Coffee sabit kategori sırasını kullan
+        MOTTO_MENU_CATEGORIES.forEach(category => {
+            if (productCats.has(category)) {
+                result.push(category);
+                productCats.delete(category);
+            }
+        });
+
+        // 3) Hâlâ kalan ürün kategorileri varsa en sona ekle
+        Array.from(productCats).forEach(category => {
+            result.push(category);
+        });
+
         return result;
     }, [products, managedCategories]);
     const favoriteProducts = useMemo(() => products.filter(p => p.isFavorite).slice(0, 4), [products]);

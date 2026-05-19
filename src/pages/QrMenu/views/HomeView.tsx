@@ -1,33 +1,17 @@
 import React, { useEffect } from 'react';
-import { Plus, Clock, Leaf, Flame, Wheat, User, Bell } from 'lucide-react';
+import {
+    ChevronLeft,
+    Grid3X3,
+    MapPin,
+    Clock,
+    Search,
+    Sparkles,
+    Star
+} from 'lucide-react';
 import { Product } from '../../../types';
 import { CustomerProfile } from './qrMenu';
-import { getTodayString } from '../../../utils/helpers';
-import { ChevronLeft, LayoutGrid, Lock } from 'lucide-react';
 import SkeletonLoader from '../components/SkeletonLoader';
 import CoffeeLoader from '../components/CoffeeLoader';
-
-const categoryEmojiMap: Record<string, string> = {
-    'Kahveler': '☕',
-    'Soğuk İçecekler': '🥤',
-    'Tatlılar': '🍰',
-    'Atıştırmalıklar': '🥪',
-    'Çaylar': '🫖',
-    'Özel Karışımlar': '🧪',
-    'Kahvaltılıklar': '🥐',
-    'Sıcak İçecekler': '🔥'
-};
-
-const categoryImageMap: Record<string, string> = {
-    'Kahveler': 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80',
-    'Soğuk İçecekler': 'https://images.unsplash.com/photo-1499638673689-79a0b5115d87?auto=format&fit=crop&w=300&q=80',
-    'Tatlılar': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=300&q=80',
-    'Atıştırmalıklar': 'https://images.unsplash.com/photo-1621510456098-9452928a330c?auto=format&fit=crop&w=300&q=80',
-    'Çaylar': 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=300&q=80',
-    'Özel Karışımlar': 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=300&q=80',
-    'Kahvaltılıklar': 'https://images.unsplash.com/photo-1533089862017-ec7373ae410c?auto=format&fit=crop&w=300&q=80',
-    'Sıcak İçecekler': 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=300&q=80'
-};
 
 interface HomeViewProps {
     loading: boolean;
@@ -35,12 +19,42 @@ interface HomeViewProps {
     categories: string[];
     activeCategory: string | null;
     productsByCategory: Record<string, Product[]>;
+    isMember: boolean;
+    customerProfile: CustomerProfile | null;
     onCategoryClick: (category: string) => void;
     onProductClick: (product: Product) => void;
+    onWheelClick: () => void;
+    onOracleClick: () => void;
+    onScratchClick: () => void;
+    onAuthClick: () => void;
+    onAccountClick: () => void;
     onResetCategory: () => void;
     t: (key: string) => string;
     categoryImages?: Record<string, string>;
 }
+
+const categoryEmojiMap: Record<string, string> = {
+    'İmza Kahveler': '☕',
+    'Kokteyl & Özel İçecekler': '🍹',
+    'Soğuk Kahveler': '🧊',
+    'Soğuk İçecekler': '🥤',
+    'Sıcak Kahveler': '🔥',
+    'Sıcak İçecekler': '🫖',
+    'Pastalar': '🍰',
+    'Sütlü Tatlılar': '🍮',
+    'Milkshake & Frappe': '🥛',
+    'Frozen & Bubble Tea': '🧋',
+    'Dondurmalar': '🍨',
+    'Yöresel Kahveler': '☕',
+
+    // Eski veri varsa bozulmasın diye:
+    'Kahveler': '☕',
+    'Tatlılar': '🍰',
+    'Çaylar': '🫖',
+    'Özel Karışımlar': '🍹',
+    'Atıştırmalıklar': '🥐',
+    'Kahvaltılıklar': '🥐'
+};
 
 const HomeView: React.FC<HomeViewProps> = ({
     loading,
@@ -51,253 +65,349 @@ const HomeView: React.FC<HomeViewProps> = ({
     onCategoryClick,
     onProductClick,
     onResetCategory,
-    t,
     categoryImages = {}
 }) => {
     useEffect(() => {
         if (activeCategory) {
-            const element = document.getElementById(`cat-tab-${activeCategory}`);
-            if (element) {
-                element.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest',
-                    inline: 'center'
-                });
-            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }, [activeCategory]);
-    const renderDietLabels = (product: Product) => (
-        <div className="flex flex-col gap-1.5 absolute top-3 left-3 z-10">
-            {product.isVegan && (
-                <div className="bg-emerald-500/90 backdrop-blur-md text-white p-1.5 rounded-full shadow-lg ring-1 ring-white/20" title="Vegan">
-                    <Leaf size={10} fill="currentColor" />
-                </div>
-            )}
-            {product.isSpicy && (
-                <div className="bg-red-500/90 backdrop-blur-md text-white p-1.5 rounded-full shadow-lg ring-1 ring-white/20" title="Acı">
-                    <Flame size={10} fill="currentColor" />
-                </div>
-            )}
-            {product.isGlutenFree && (
-                <div className="bg-amber-500/90 backdrop-blur-md text-white p-1.5 rounded-full shadow-lg ring-1 ring-white/20" title="Glutensiz">
-                    <Wheat size={10} />
-                </div>
-            )}
-        </div>
-    );
 
     if (loading) return <SkeletonLoader />;
 
-    if (products.length === 0) return (
-        <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center pb-32">
-            <CoffeeLoader />
-        </div>
-    );
+    if (products.length === 0) {
+        return (
+            <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center pb-32">
+                <CoffeeLoader />
+            </div>
+        );
+    }
+
+    const featuredProducts = products.slice(0, 4);
 
     return (
+        <main className="min-h-screen bg-[#FDFBF7] pb-32 text-[#432818]">
+            {!activeCategory ? (
+                <>
+                    <HeroSection />
 
-        <div className="min-h-screen bg-[#FDFBF7] pb-32">
-            {/* --- PREMIUM HEADER --- */}
-            <div className="bg-[#FDFBF7]/80 backdrop-blur-xl z-40 sticky top-0 transition-all border-b border-[#432818]/5 pb-0 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
-                <div className="p-5 pb-3">
-                    <div className="relative flex items-center justify-between mb-2 min-h-[48px]">
+                    <section className="px-5 mt-6">
+                        <div className="rounded-[2.2rem] bg-gradient-to-br from-[#432818] to-[#24140d] p-5 text-[#FDFBF7] shadow-[0_18px_45px_rgba(67,40,24,0.18)] overflow-hidden relative">
+                            <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full bg-[#D4AF37]/10" />
+                            <div className="absolute -right-6 -bottom-10 text-[7rem] opacity-10">
+                                ☕
+                            </div>
 
-                        {/* Left: Back Button */}
-                        <div className="flex items-center min-w-[48px] z-20">
-                            {activeCategory && (
-                                <button
-                                    onClick={onResetCategory}
-                                    className="w-11 h-11 rounded-[1.2rem] bg-white text-[#432818] ring-1 ring-[#432818]/5 flex items-center justify-center active:scale-90 hover:shadow-lg transition-all duration-300 group"
-                                >
-                                    <ChevronLeft size={22} className="group-hover:-translate-x-0.5 transition-transform" />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Center: Brand Title */}
-                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center z-10 pointer-events-none">
-                            <button
-                                onClick={onResetCategory}
-                                className="pointer-events-auto flex flex-col items-center justify-center group/brand"
-                            >
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="h-[1.5px] w-4 bg-[#D4AF37]"></span>
-                                    <span className="text-xs font-black text-[#D4AF37] uppercase tracking-[0.4em] font-cinzel leading-none drop-shadow-sm">
-                                        {activeCategory ? 'MENÜ' : 'MOTTO'}
+                            <div className="relative z-10">
+                                <div className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/20 px-3 py-1 mb-4">
+                                    <Sparkles size={14} className="text-[#D4AF37]" />
+                                    <span className="text-[10px] font-black tracking-[0.18em] uppercase text-[#D4AF37]">
+                                        Bu Haftaya Özel
                                     </span>
-                                    <span className="h-[1.5px] w-4 bg-[#D4AF37]"></span>
                                 </div>
-                                <h1 className="text-2xl font-black text-[#432818] tracking-widest font-cinzel leading-none drop-shadow-md whitespace-nowrap bg-gradient-to-br from-[#432818] to-[#603813] bg-clip-text text-transparent">
-                                    {activeCategory ? activeCategory.toUpperCase() : 'OLIMPOS'}
-                                </h1>
-                            </button>
+
+                                <h2 className="text-2xl font-black leading-tight mb-2">
+                                    Kahve yanında tatlı keyfi
+                                </h2>
+
+                                <p className="text-sm leading-relaxed text-[#FDFBF7]/75 max-w-[260px]">
+                                    Günlük kampanyaları, öne çıkan ürünleri ve özel fırsatları burada göstereceğiz.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="px-5 mt-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <p className="text-[#D4AF37] text-[11px] font-black tracking-[0.25em] uppercase mb-1">
+                                    Menü
+                                </p>
+                                <h2 className="text-2xl font-black">
+                                    Kategoriler
+                                </h2>
+                            </div>
+
+                            <div className="w-11 h-11 rounded-[1.25rem] bg-white border border-[#432818]/10 flex items-center justify-center shadow-sm">
+                                <Grid3X3 size={20} />
+                            </div>
                         </div>
 
-                        <div className="flex items-center gap-3 z-20">
-                            {/* Removed auth/account button from header */}
+                        <div className="grid grid-cols-2 gap-4">
+                            {categories.map((category) => (
+                                <CategoryCard
+                                    key={category}
+                                    category={category}
+                                    count={productsByCategory[category]?.length || 0}
+                                    image={categoryImages[category]}
+                                    onClick={() => onCategoryClick(category)}
+                                />
+                            ))}
                         </div>
-                    </div>
+                    </section>
+
+                    <section className="px-5 mt-9">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <p className="text-[#D4AF37] text-[11px] font-black tracking-[0.25em] uppercase mb-1">
+                                    Seçili Lezzetler
+                                </p>
+                                <h2 className="text-2xl font-black">
+                                    Öne Çıkanlar
+                                </h2>
+                            </div>
+
+                            <Star size={22} className="text-[#D4AF37]" />
+                        </div>
+
+                        <div className="grid gap-4">
+                            {featuredProducts.map((product) => (
+                                <ProductCard
+                                    key={product.id}
+                                    product={product}
+                                    onClick={() => onProductClick(product)}
+                                />
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className="px-5 mt-9">
+                        <div className="rounded-[2rem] bg-white border border-[#432818]/10 p-5 shadow-[0_12px_35px_rgba(67,40,24,0.06)]">
+                            <div className="flex gap-4">
+                                <div className="w-12 h-12 rounded-[1.2rem] bg-[#432818]/5 flex items-center justify-center shrink-0">
+                                    <MapPin size={22} />
+                                </div>
+
+                                <div>
+                                    <h3 className="font-black mb-1">
+                                        Motto Coffee Yüksekova
+                                    </h3>
+                                    <p className="text-sm text-[#432818]/60 leading-relaxed">
+                                        İpek Yolu Caddesi Halkbank karşısı Altekin Plaza altı, Yüksekova / Hakkari
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-[#432818]/10 my-4" />
+
+                            <div className="flex gap-4">
+                                <div className="w-12 h-12 rounded-[1.2rem] bg-[#432818]/5 flex items-center justify-center shrink-0">
+                                    <Clock size={22} />
+                                </div>
+
+                                <div>
+                                    <h3 className="font-black mb-1">
+                                        Çalışma Saatleri
+                                    </h3>
+                                    <p className="text-sm text-[#432818]/60">
+                                        08:00 - 01:00
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </>
+            ) : (
+                <CategoryProductsView
+                    category={activeCategory}
+                    products={productsByCategory[activeCategory] || []}
+                    onBack={onResetCategory}
+                    onProductClick={onProductClick}
+                />
+            )}
+        </main>
+    );
+};
+
+function HeroSection() {
+    return (
+        <header className="px-5 pt-8 text-center">
+            <div className="mx-auto w-40 h-32 rounded-[2.5rem] bg-white border border-[#432818]/10 shadow-[0_18px_45px_rgba(67,40,24,0.12)] overflow-hidden flex items-center justify-center mb-6">
+                <img
+                    src="/logo.png"
+                    alt="Motto Coffee Logo"
+                    className="w-full h-full object-cover"
+                />
+            </div>
+
+            <p className="text-[#D4AF37] text-[11px] font-black tracking-[0.35em] uppercase mb-2">
+                QR Menü
+            </p>
+
+            <h1 className="text-[2.15rem] leading-tight font-black tracking-tight">
+                Motto Coffee
+                <span className="block text-[1.6rem]">
+                    & Patisserie
+                </span>
+            </h1>
+
+            <p className="text-[#432818]/55 font-bold mt-3">
+                Wake up to a new motto!
+            </p>
+
+            <div className="mt-5 flex items-center justify-center gap-2 text-[#432818]/45 text-xs font-bold">
+                <Search size={15} />
+                <span>Alt menüden arama yapabilir, garson çağırabilir veya iletişim bilgilerine ulaşabilirsiniz.</span>
+            </div>
+        </header>
+    );
+}
+
+function CategoryCard({
+    category,
+    count,
+    image,
+    onClick
+}: {
+    category: string;
+    count: number;
+    image?: string;
+    onClick: () => void;
+}) {
+    const emoji = categoryEmojiMap[category] || '☕';
+
+    return (
+        <button
+            onClick={onClick}
+            className="group min-h-[150px] rounded-[2rem] bg-white border border-[#432818]/10 shadow-[0_12px_30px_rgba(67,40,24,0.06)] p-4 text-left active:scale-[0.97] transition-all overflow-hidden relative"
+        >
+            <div className="absolute -right-8 -bottom-8 text-[6rem] opacity-[0.04] group-hover:opacity-[0.08] transition-opacity">
+                {emoji}
+            </div>
+
+            <div className="relative z-10">
+                <div className="w-16 h-16 rounded-[1.5rem] bg-[#F7EFE6] border border-[#432818]/8 flex items-center justify-center text-3xl overflow-hidden mb-4">
+                    {image ? (
+                        <img src={image} alt={category} className="w-full h-full object-cover" />
+                    ) : (
+                        <span>{emoji}</span>
+                    )}
                 </div>
 
-                {/* Categories Tab Bar */}
-                <div className={`px-5 pb-2 overflow-x-auto scrollbar-hide flex gap-3 snap-x transition-all duration-300 ${activeCategory ? 'pb-4' : 'pb-2'}`}>
-                    {categories.map(cat => (
-                        <button
-                            id={`cat-tab-${cat}`}
-                            key={cat}
-                            onClick={() => onCategoryClick(cat)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all font-cinzel tracking-[0.1em] shrink-0 snap-center border shadow-sm flex items-center gap-2 ${activeCategory === cat
-                                ? 'bg-[#432818] text-[#D4AF37] border-[#432818] scale-105 shadow-md'
-                                : 'bg-white text-[#432818]/60 border-[#432818]/5 hover:bg-[#FDFBF7] hover:border-[#D4AF37]/20'}`}
-                        >
-                            {activeCategory && <span className="text-base">{categoryEmojiMap[cat] || '☕'}</span>}
-                            <span>{cat.toUpperCase()}</span>
-                        </button>
-                    ))}
+                <h3 className="font-black text-[#432818] leading-tight text-[15px] mb-2">
+                    {category}
+                </h3>
+
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#432818]/5 px-2.5 py-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
+                    <span className="text-[10px] font-black text-[#432818]/55 uppercase tracking-wider">
+                        {count} ürün
+                    </span>
+                </div>
+            </div>
+        </button>
+    );
+}
+
+function CategoryProductsView({
+    category,
+    products,
+    onBack,
+    onProductClick
+}: {
+    category: string;
+    products: Product[];
+    onBack: () => void;
+    onProductClick: (product: Product) => void;
+}) {
+    return (
+        <section className="px-5 pt-5">
+            <div className="sticky top-0 z-30 -mx-5 px-5 pt-4 pb-4 bg-[#FDFBF7]/95 backdrop-blur-xl border-b border-[#432818]/5">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={onBack}
+                        className="w-12 h-12 rounded-[1.3rem] bg-white border border-[#432818]/10 flex items-center justify-center shadow-sm active:scale-95"
+                    >
+                        <ChevronLeft size={23} />
+                    </button>
+
+                    <div className="min-w-0">
+                        <p className="text-[#D4AF37] text-[10px] font-black tracking-[0.25em] uppercase mb-1">
+                            Kategori
+                        </p>
+                        <h1 className="text-2xl font-black truncate">
+                            {category}
+                        </h1>
+                    </div>
                 </div>
             </div>
 
-            <div className="pt-6">
-                {!activeCategory ? (
-                    <>
-                        <div className="px-5 space-y-4 mt-6">
-                            {/* Widgets removed as requested */}
-                        </div>
+            <div className="grid gap-4 mt-5">
+                {products.map((product) => (
+                    <ProductCard
+                        key={product.id}
+                        product={product}
+                        onClick={() => onProductClick(product)}
+                    />
+                ))}
+            </div>
+        </section>
+    );
+}
 
-                        {/* --- CATEGORY GRID --- */}
-                        <div className="mt-16">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="w-10 h-10 rounded-2xl bg-[#432818]/5 flex items-center justify-center text-[#432818] shadow-sm"><LayoutGrid size={20} strokeWidth={2} /></div>
-                                <h2 className="text-2xl font-black text-[#432818] font-cinzel leading-none uppercase tracking-tight">Menüyü Keşfet</h2>
-                            </div>
+function ProductCard({
+    product,
+    onClick
+}: {
+    product: Product;
+    onClick: () => void;
+}) {
+    const imageValue = (product as any).image as string | undefined;
+    const hasImage =
+        typeof imageValue === 'string' &&
+        (imageValue.startsWith('http') ||
+            imageValue.startsWith('/') ||
+            imageValue.startsWith('data:'));
 
-                            <div className="grid grid-cols-2 gap-4">
-                                {categories.map((cat) => (
-                                    <button
-                                        key={cat}
-                                        onClick={() => onCategoryClick(cat)}
-                                        className="group relative h-40 bg-white rounded-[2.5rem] border border-[#432818]/10 shadow-lg shadow-[#432818]/5 hover:shadow-xl hover:shadow-[#432818]/10 overflow-hidden active:scale-95 transition-all p-4 flex flex-col justify-center items-center text-center gap-3 hover:border-[#D4AF37]"
-                                    >
-                                        <div className="w-16 h-16 bg-[#F9F7F5] rounded-[1.5rem] flex items-center justify-center text-3xl group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500 shadow-sm ring-1 ring-[#432818]/5 overflow-hidden relative">
-                                            {categoryImages[cat] || categoryImageMap[cat] ? (
-                                                <img
-                                                    src={categoryImages[cat] || categoryImageMap[cat]}
-                                                    alt={cat}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                categoryEmojiMap[cat] || '☕'
-                                            )}
-                                            {/* Gradient Overlay for Images */}
-                                            {(categoryImages[cat] || categoryImageMap[cat]) && <div className="absolute inset-0 bg-[#432818]/10 group-hover:bg-transparent transition-colors"></div>}
-                                        </div>
-                                        <div className="z-10 relative w-full flex flex-col items-center">
-                                            <h3 className="font-extrabold text-[#432818] font-cinzel text-sm leading-tight tracking-wide mb-1 group-hover:text-[#BB9457] transition-colors break-words w-full px-1">{cat.toUpperCase()}</h3>
-                                            <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity justify-center">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"></span>
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-[#432818]">{productsByCategory[cat]?.length || 0} ÇEŞİT</span>
-                                            </div>
-                                        </div>
+    const isSoldOut = (product as any).stock !== undefined && (product as any).stock <= 0;
 
-                                        {/* Decorative Background */}
-                                        <div className="absolute -right-6 -bottom-6 text-[5rem] opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none rotate-12 filter grayscale">
-                                            {categoryEmojiMap[cat] || '☕'}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </>
+    return (
+        <button
+            onClick={onClick}
+            disabled={isSoldOut}
+            className={`w-full rounded-[2rem] bg-white border border-[#432818]/10 shadow-[0_12px_32px_rgba(67,40,24,0.06)] p-4 text-left flex gap-4 active:scale-[0.98] transition-all ${isSoldOut ? 'opacity-50 grayscale' : ''
+                }`}
+        >
+            <div className="w-20 h-20 rounded-[1.5rem] bg-[#F7EFE6] border border-[#432818]/8 flex items-center justify-center text-3xl shrink-0 overflow-hidden">
+                {hasImage ? (
+                    <img src={imageValue} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
-                    <div
-                        className="px-5 animate-in fade-in duration-500 ease-out"
-                        onTouchStart={(e) => {
-                            const touch = e.touches[0];
-                            (window as any).swipeStartX = touch.clientX;
-                            (window as any).swipeStartY = touch.clientY;
-                        }}
-                        onTouchEnd={(e) => {
-                            const touch = e.changedTouches[0];
-                            const deltaX = touch.clientX - (window as any).swipeStartX;
-                            const deltaY = touch.clientY - (window as any).swipeStartY;
-
-                            // Yatay hareketi dikeyden daha baskın mı? (Dikey scroll'u bozmamak için)
-                            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 70) {
-                                const currentIndex = categories.indexOf(activeCategory);
-                                if (deltaX > 0) {
-                                    // Swipe Right -> Previous Category
-                                    if (currentIndex > 0) {
-                                        onCategoryClick(categories[currentIndex - 1]);
-                                    }
-                                } else {
-                                    // Swipe Left -> Next Category
-                                    if (currentIndex < categories.length - 1) {
-                                        onCategoryClick(categories[currentIndex + 1]);
-                                    }
-                                }
-                            }
-                        }}
-                    >
-                        {/* --- PRODUCT LIST --- */}
-                        <div className="grid gap-5 pb-20">
-                            {productsByCategory[activeCategory]?.map((item, index) => (
-                                <div
-                                    key={item.id}
-                                    onClick={() => item.stock !== undefined && item.stock <= 0 ? null : onProductClick(item)}
-                                    className={`group bg-white p-4 rounded-[2.5rem] border border-[#432818]/5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex gap-5 active:scale-[0.98] transition-all relative overflow-hidden ${item.stock !== undefined && item.stock <= 0 ? 'opacity-60 grayscale cursor-not-allowed' : 'hover:shadow-[0_15px_40px_rgba(67,40,24,0.08)] hover:border-[#D4AF37]/30'}`}
-                                    style={{ animationDelay: `${index * 50}ms` }}
-                                >
-                                    {renderDietLabels(item)}
-                                    <div className="w-28 h-28 bg-[#F9F7F5] rounded-[2rem] flex items-center justify-center text-5xl shrink-0 relative group-hover:scale-105 transition-transform duration-500 overflow-hidden shadow-inner ring-1 ring-[#432818]/5">
-                                        {item.image ? (
-                                            item.image.startsWith('http') ? (
-                                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                item.image
-                                            )
-                                        ) : (
-                                            '☕'
-                                        )}
-                                        <div className="absolute inset-0 bg-gradient-to-tr from-white/20 via-transparent to-transparent"></div>
-                                        {item.stock !== undefined && item.stock <= 0 && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20">
-                                                <span className="text-[10px] font-black text-white bg-red-600 px-2 py-1 rounded-[0.5rem] uppercase tracking-widest border border-white/20 shadow-lg -rotate-12">Tükendi</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 py-1.5 flex flex-col justify-between min-w-0">
-                                        <div>
-                                            <div className="flex justify-between items-start">
-                                                <h3 className="font-black text-[#432818] font-cinzel text-lg leading-tight truncate pr-2 group-hover:text-[#D4AF37] transition-colors">{item.name}</h3>
-                                            </div>
-                                            <p className="text-[11px] font-medium text-[#432818]/50 line-clamp-2 mt-1.5 leading-relaxed tracking-wide">{item.description}</p>
-                                        </div>
-                                        <div className="flex justify-between items-end mt-2">
-                                            <div className="flex flex-col">
-                                                <span className="text-[9px] font-black text-[#BB9457] uppercase tracking-widest opacity-80 mb-0.5">FİYAT</span>
-                                                <span className="font-black text-[#432818] text-2xl font-cinzel leading-none tracking-tighter">{item.price} ₺</span>
-                                            </div>
-                                            <button
-                                                disabled={item.stock !== undefined && item.stock <= 0}
-                                                className={`w-11 h-11 rounded-2xl flex items-center justify-center border border-[#432818]/10 transition-all duration-300 ${item.stock !== undefined && item.stock <= 0 ? 'bg-[#432818]/5 text-[#432818]/20 cursor-not-allowed' : 'bg-[#432818]/5 text-[#432818] group-hover:bg-[#432818] group-hover:text-[#D4AF37] group-hover:shadow-lg group-hover:shadow-[#432818]/20'}`}
-                                            >
-                                                <Plus size={22} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <span>{imageValue || '☕'}</span>
                 )}
             </div>
 
-            <div className="flex flex-col items-center justify-center py-12 opacity-30 mix-blend-multiply">
-                <div className="w-8 h-8 opacity-20 mb-3 grayscale">☕</div>
-                <p className="text-[10px] font-black font-cinzel tracking-[0.4em] text-[#432818]">EST. 2023 • MOTTO CLUB</p>
+            <div className="flex-1 min-w-0">
+                <div className="flex justify-between gap-3">
+                    <div className="min-w-0">
+                        <h3 className="font-black text-[#432818] text-[17px] leading-tight">
+                            {product.name}
+                        </h3>
+
+                        {product.description && (
+                            <p className="text-[#432818]/55 text-sm leading-relaxed mt-1 line-clamp-2">
+                                {product.description}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                        <span className="block text-[10px] font-black text-[#D4AF37] tracking-[0.16em] uppercase mb-1">
+                            Fiyat
+                        </span>
+                        <strong className="text-[#432818] text-xl font-black whitespace-nowrap">
+                            {product.price}₺
+                        </strong>
+                    </div>
+                </div>
+
+                {isSoldOut && (
+                    <div className="mt-3 inline-flex rounded-full bg-red-500/10 px-3 py-1 text-red-600 text-xs font-black">
+                        Tükendi
+                    </div>
+                )}
             </div>
-        </div >
+        </button>
     );
-};
+}
 
 export default HomeView;
